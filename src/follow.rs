@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     first::compute_first_set, production::Production, symbol::unique_symbols, terminal::Terminal,
-    Symbol, TokenType,
+    Symbol,
 };
 
 pub fn compute_follow_set<T: PartialEq + Clone + Eq + Debug + Hash + Terminal>(

@@ -1,20 +1,16 @@
-use std::collections;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::ptr::hash;
 
 use crate::action::Action;
 use crate::first::compute_first_set;
-use crate::follow;
 use crate::follow::compute_follow_set;
 use crate::production::Production;
 use crate::state::State;
 use crate::symbol::unique_symbols;
 use crate::terminal::Terminal;
 use crate::Symbol;
-use crate::TokenType;
 
 #[derive(Debug)]
 pub struct Parser<T>
@@ -218,7 +214,41 @@ impl<T: PartialEq + Clone + Eq + Debug + Terminal + Hash> Parser<T> {
                 break;
             }
         }
-        println!("{:#?}", canonical_collection);
+        self.lr0_automaton = canonical_collection;
+    }
+
+    pub fn parse(&self, input: Vec<T>) {
+        let mut stack: Vec<State<T>> = Vec::new();
+        let mut input_iter = input.iter();
+        let mut a = input_iter.next().unwrap();
+        let mut top_state = self.lr0_automaton.first().unwrap();
+        stack.push(top_state.clone());
+        loop {
+            top_state = stack.last().unwrap();
+            if top_state.action.contains_key(a) {
+                match top_state.action.get(a).unwrap() {
+                    Action::SHIFT(state) => {
+                        stack.push(self.lr0_automaton.get(state.clone()).unwrap().clone());
+                        a = input_iter.next().unwrap();
+                    }
+                    Action::REDUCE(production) => {
+                        let production_ = self.productions.get(production.clone()).unwrap();
+                        let pop_len = production_.body.len();
+                        for _ in 0..pop_len {
+                            stack.pop();
+                        }
+                        let stack_top = stack.last().unwrap();
+                        let goto_state = stack_top.goto.get(&production_.head).unwrap();
+                        stack.push(self.lr0_automaton.get(goto_state.clone()).unwrap().clone());
+                    }
+                    Action::ACCEPT => {
+                        println!("hell yeah");
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+        }
     }
 }
 

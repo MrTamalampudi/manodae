@@ -38,5 +38,14 @@ fn main() {
         Z -> TokenType::C
     );
     //println!("{:#?}", grammar.productions);
-    Parser::new(grammar.productions).compute_lr0_items();
+    let mut p = Parser::new(grammar.productions);
+    p.compute_lr0_items();
+    let input = vec![
+        TokenType::A,
+        TokenType::B,
+        TokenType::C,
+        TokenType::C,
+        TokenType::EOF,
+    ];
+    p.parse(input);
 }
