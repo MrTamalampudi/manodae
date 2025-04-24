@@ -5,7 +5,7 @@ use crate::{terminal::Terminal, Symbol};
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Production<T>
 where
-    T: Clone + Debug + PartialEq + Eq + Terminal<T>,
+    T: Clone + Debug + PartialEq + Eq + Terminal,
 {
     pub head: String,
     pub body: Vec<Symbol<T>>,
@@ -13,7 +13,7 @@ where
     pub index: usize,
 }
 
-impl<T: Clone + Debug + PartialEq + Eq + Terminal<T>> Production<T> {
+impl<T: Clone + Debug + PartialEq + Eq + Terminal> Production<T> {
     pub fn next_symbol(&self) -> Option<&Symbol<T>> {
         if self.cursor_pos == self.body.len() {
             None

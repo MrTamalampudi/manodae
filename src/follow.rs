@@ -9,7 +9,7 @@ use crate::{
     Symbol, TokenType,
 };
 
-pub fn compute_follow_set<T: PartialEq + Clone + Eq + Debug + Hash + Terminal<T>>(
+pub fn compute_follow_set<T: PartialEq + Clone + Eq + Debug + Hash + Terminal>(
     productions: &Vec<Production<T>>,
 ) -> HashMap<Symbol<T>, HashSet<T>> {
     let symbols: Vec<Symbol<T>> = unique_symbols(productions);

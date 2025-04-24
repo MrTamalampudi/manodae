@@ -24,7 +24,7 @@ pub enum TokenType {
     EOF,
 }
 
-impl Terminal<TokenType> for TokenType {
+impl Terminal for TokenType {
     fn get_ending_token() -> TokenType {
         TokenType::EOF
     }

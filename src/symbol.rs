@@ -5,14 +5,14 @@ use crate::{production::Production, terminal::Terminal};
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Symbol<T>
 where
-    T: PartialEq + Debug + Clone + Eq + Terminal<T>,
+    T: PartialEq + Debug + Clone + Eq + Terminal,
 {
     TERMINAL(T),
     NONTERMINAL(String),
     NONE,
 }
 
-pub fn unique_symbols<T: PartialEq + Debug + Clone + Eq + Terminal<T>>(
+pub fn unique_symbols<T: PartialEq + Debug + Clone + Eq + Terminal>(
     productions: &Vec<Production<T>>,
 ) -> Vec<Symbol<T>> {
     let mut symbols: Vec<Symbol<T>> = Vec::new();
@@ -29,7 +29,7 @@ pub fn unique_symbols<T: PartialEq + Debug + Clone + Eq + Terminal<T>>(
     symbols
 }
 
-impl<T: Debug + Clone + Eq + Terminal<T>> Symbol<T> {
+impl<T: Debug + Clone + Eq + Terminal> Symbol<T> {
     pub fn is_terminal(&self) -> bool {
         matches!(self, Symbol::TERMINAL(_))
     }

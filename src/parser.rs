@@ -19,7 +19,7 @@ use crate::TokenType;
 #[derive(Debug)]
 pub struct Parser<T>
 where
-    T: PartialEq + Clone + Eq + Debug + Terminal<T>,
+    T: PartialEq + Clone + Eq + Debug + Terminal,
 {
     pub productions: Vec<Production<T>>,
     pub lr0_automaton: Vec<State<T>>,
@@ -28,7 +28,7 @@ where
     pub first_set: HashMap<Symbol<T>, HashSet<T>>,
 }
 
-impl<T: PartialEq + Clone + Eq + Debug + Terminal<T> + Hash> Parser<T> {
+impl<T: PartialEq + Clone + Eq + Debug + Terminal + Hash> Parser<T> {
     pub fn new(productions: Vec<Production<T>>) -> Parser<T> {
         let mut productions_ = productions.clone();
 
@@ -222,7 +222,7 @@ impl<T: PartialEq + Clone + Eq + Debug + Terminal<T> + Hash> Parser<T> {
     }
 }
 
-fn is_items_in_canonical_collection<T: Clone + Eq + Debug + Terminal<T>>(
+fn is_items_in_canonical_collection<T: Clone + Eq + Debug + Terminal>(
     states: Vec<State<T>>,
     item: &Vec<Production<T>>,
 ) -> (bool, Option<State<T>>) {
@@ -246,7 +246,7 @@ fn is_items_in_canonical_collection<T: Clone + Eq + Debug + Terminal<T>>(
     (contains, None)
 }
 
-fn compute_shift_reduce_productions<T: Clone + Eq + Debug + Terminal<T>>(
+fn compute_shift_reduce_productions<T: Clone + Eq + Debug + Terminal>(
     productions: &Vec<Production<T>>,
 ) -> (Vec<Production<T>>, Vec<Production<T>>) {
     let filter_by_dot_at_the_rightend =

@@ -5,7 +5,7 @@ use crate::{action::Action, production::Production, symbol::Symbol, terminal::Te
 #[derive(Debug, Clone)]
 pub struct State<T>
 where
-    T: Clone + PartialEq + Eq + Debug + Terminal<T>,
+    T: Clone + PartialEq + Eq + Debug + Terminal,
 {
     pub state: usize,
     pub productions: Vec<Production<T>>,

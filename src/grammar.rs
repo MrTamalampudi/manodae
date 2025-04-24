@@ -7,12 +7,12 @@ use crate::{production::Production, terminal::Terminal};
 #[derive(Debug)]
 pub struct Grammar<T>
 where
-    T: Clone + PartialEq + Eq + Debug + Terminal<T>,
+    T: Clone + PartialEq + Eq + Debug + Terminal,
 {
     pub productions: Vec<Production<T>>,
 }
 
-impl<T: Clone + Debug + PartialEq + Eq + Terminal<T>> Grammar<T> {
+impl<T: Clone + Debug + PartialEq + Eq + Terminal> Grammar<T> {
     pub fn new() -> Grammar<T> {
         Grammar {
             productions: Vec::new(),

@@ -6,7 +6,7 @@ use std::{
 
 use crate::{production::Production, symbol::unique_symbols, terminal::Terminal, Symbol};
 
-pub fn compute_first_set<T: PartialEq + Clone + Eq + Debug + Hash + Terminal<T>>(
+pub fn compute_first_set<T: PartialEq + Clone + Eq + Debug + Hash + Terminal>(
     productions: &Vec<Production<T>>,
 ) -> HashMap<Symbol<T>, HashSet<T>> {
     let symbols = unique_symbols(productions);

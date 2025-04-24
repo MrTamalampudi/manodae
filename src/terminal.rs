@@ -1,3 +1,3 @@
-pub trait Terminal<T> {
-    fn get_ending_token() -> T;
+pub trait Terminal {
+    fn get_ending_token() -> Self;
 }
