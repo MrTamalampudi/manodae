@@ -1,12 +1,19 @@
-use std::collections::{HashMap, HashSet};
-
-use crate::{
-    first::compute_first_set, production::Production, symbol::unique_symbols, Symbol, TokenType,
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+    hash::Hash,
 };
 
-pub fn compute_follow_set(productions: &Vec<Production>) -> HashMap<Symbol, HashSet<TokenType>> {
-    let symbols: Vec<Symbol> = unique_symbols(productions);
-    let non_terminals: Vec<Symbol> = symbols
+use crate::{
+    first::compute_first_set, production::Production, symbol::unique_symbols, terminal::Terminal,
+    Symbol, TokenType,
+};
+
+pub fn compute_follow_set<T: PartialEq + Clone + Eq + Debug + Hash + Terminal<T>>(
+    productions: &Vec<Production<T>>,
+) -> HashMap<Symbol<T>, HashSet<T>> {
+    let symbols: Vec<Symbol<T>> = unique_symbols(productions);
+    let non_terminals: Vec<Symbol<T>> = symbols
         .iter()
         .cloned()
         .filter_map(|symbol| match symbol {
@@ -15,14 +22,14 @@ pub fn compute_follow_set(productions: &Vec<Production>) -> HashMap<Symbol, Hash
         })
         .collect();
 
-    let mut follow_map: HashMap<Symbol, HashSet<TokenType>> = HashMap::new();
+    let mut follow_map: HashMap<Symbol<T>, HashSet<T>> = HashMap::new();
 
     //populate with empty vectors
     non_terminals.iter().for_each(|symbol| {
         follow_map.insert(symbol.clone(), HashSet::new());
     });
 
-    let augment_production: Option<&Production> = productions
+    let augment_production: Option<&Production<T>> = productions
         .iter()
         .filter(|prod| prod.head.eq(&String::from("S'")))
         .next();
@@ -32,7 +39,7 @@ pub fn compute_follow_set(productions: &Vec<Production>) -> HashMap<Symbol, Hash
             let start = prod.body.first().unwrap();
             match start {
                 Symbol::NONTERMINAL(_) => {
-                    follow_map.insert(start.clone(), HashSet::from([TokenType::EOF]));
+                    follow_map.insert(start.clone(), HashSet::from([T::get_ending_token()]));
                 }
                 _ => {}
             };
@@ -46,7 +53,7 @@ pub fn compute_follow_set(productions: &Vec<Production>) -> HashMap<Symbol, Hash
     //this loop implements above def
     for nt in non_terminals.iter() {
         for production in productions.iter() {
-            let with_indexes: Vec<(usize, &Symbol)> = production
+            let with_indexes: Vec<(usize, &Symbol<T>)> = production
                 .body
                 .iter()
                 .enumerate()
@@ -72,7 +79,7 @@ pub fn compute_follow_set(productions: &Vec<Production>) -> HashMap<Symbol, Hash
 
     //A->aB then everything in  Follow(A) is in Follow(B)
     loop {
-        let follow_count_func = |follow_map: &HashMap<Symbol, HashSet<TokenType>>| {
+        let follow_count_func = |follow_map: &HashMap<Symbol<T>, HashSet<T>>| {
             follow_map
                 .values()
                 .flat_map(|token_types| token_types)

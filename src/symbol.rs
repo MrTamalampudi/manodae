@@ -1,14 +1,21 @@
-use crate::{production::Production, TokenType};
+use std::fmt::Debug;
+
+use crate::{production::Production, terminal::Terminal};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Symbol {
-    TERMINAL(TokenType),
+pub enum Symbol<T>
+where
+    T: PartialEq + Debug + Clone + Eq + Terminal<T>,
+{
+    TERMINAL(T),
     NONTERMINAL(String),
     NONE,
 }
 
-pub fn unique_symbols(productions: &Vec<Production>) -> Vec<Symbol> {
-    let mut symbols = Vec::new();
+pub fn unique_symbols<T: PartialEq + Debug + Clone + Eq + Terminal<T>>(
+    productions: &Vec<Production<T>>,
+) -> Vec<Symbol<T>> {
+    let mut symbols: Vec<Symbol<T>> = Vec::new();
 
     for production in productions.iter() {
         for symbol in production.body.iter() {
@@ -18,11 +25,11 @@ pub fn unique_symbols(productions: &Vec<Production>) -> Vec<Symbol> {
         }
     }
 
-    symbols.push(Symbol::TERMINAL(TokenType::EOF));
+    symbols.push(Symbol::TERMINAL(T::get_ending_token()));
     symbols
 }
 
-impl Symbol {
+impl<T: Debug + Clone + Eq + Terminal<T>> Symbol<T> {
     pub fn is_terminal(&self) -> bool {
         matches!(self, Symbol::TERMINAL(_))
     }
