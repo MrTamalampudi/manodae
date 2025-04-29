@@ -21,7 +21,7 @@ impl Grammar {
 macro_rules! grammar {
     (
         $terminal_type:ident,
-        $($head:ident -> $($([$terminal:expr])? $($non_terminal1:ident $non_terminal2:ident)?)|+);+
+        $($head:ident -> $([$($terminal:expr),+] $($non_terminal1:ident $non_terminal2:ident)?)|+);+
     ) => {{
         let mut grammar: Grammar= Grammar::new();
         $({

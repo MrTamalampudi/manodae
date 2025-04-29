@@ -48,8 +48,8 @@ fn main() {
     let dummy = String::new();
     let grammar: Grammar = crate::grammar!(
         TokenType,
-        S -> A B
-        |B C;
+        S -> [TokenType::A,TokenType::B] A B
+        |[TokenType::B] B C;
         A -> [TokenType::A];
         B -> [TokenType::A];
         C -> [TokenType::B]
