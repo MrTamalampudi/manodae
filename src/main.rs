@@ -48,12 +48,15 @@ fn main() {
     let dummy = String::new();
     let grammar: Grammar = crate::grammar!(
         TokenType,
-        S -> A B;
+        S -> A B
+        |B C;
         A -> [TokenType::A];
-        B -> [TokenType::B]
+        B -> [TokenType::A];
+        C -> [TokenType::B]
     );
     let mut p = Parser::new(grammar.productions);
     p.compute_lr0_items();
-    let input = vec![TokenType::A, TokenType::A, TokenType::EOF];
-    p.parse(input);
+    println!("{:#?}", p.lr0_automaton);
+    // let input = vec![TokenType::A, TokenType::A, TokenType::EOF];
+    // p.parse(input);
 }

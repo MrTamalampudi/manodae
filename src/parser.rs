@@ -1,7 +1,9 @@
+use core::panic;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::str::Matches;
 
 use crate::action::Action;
 use crate::first::compute_first_set;
@@ -9,6 +11,7 @@ use crate::follow::compute_follow_set;
 use crate::production::Production;
 use crate::state::State;
 use crate::symbol::unique_symbols;
+use crate::terminal;
 use crate::terminal::Terminal;
 use crate::Symbol;
 use crate::TokenType;
@@ -125,25 +128,33 @@ impl Parser {
             goto: HashMap::new(),
         };
         let mut canonical_collection: Vec<State> = vec![initial_state];
+        let mut state_index = 0;
         loop {
             //this clone is for because we cant update the vector which is already in use
             let mut canonical_clone = canonical_collection.clone();
-            for state in canonical_clone.iter_mut() {
+            for state_clone in canonical_clone.iter() {
                 let (reduce_productions, shift_productions) =
-                    compute_shift_reduce_productions(&state.productions);
+                    compute_shift_reduce_productions(&state_clone.productions);
                 for symbol in self.symbols.iter() {
-                    if symbol.is_terminal() {
+                    if let Symbol::TERMINAL(terminal) = symbol {
                         for production in reduce_productions.iter() {
-                            let state_ = canonical_collection.get_mut(state.state).expect("");
+                            let state = canonical_collection.get_mut(state_clone.state).expect("");
                             //eofff
-                            if production.head == String::from("S'")
-                                && symbol.eq(&Symbol::TERMINAL(String::from("EOF")))
+                            if production.is_augment_production()
+                                && terminal.eq(&String::from("EOF"))
                             {
-                                state_.action.insert(String::from("EOF"), Action::ACCEPT);
+                                if let Some(action) = state.action.get("EOF") {
+                                    if !matches!(action, Action::ACCEPT) {
+                                        panic!("conflict");
+                                    }
+                                } else {
+                                    state.action.insert(String::from("EOF"), Action::ACCEPT);
+                                }
                             }
-                            if production.head == String::from("S'") {
+                            if production.is_augment_production() {
                                 continue;
                             }
+
                             let set = self
                                 .follow_set
                                 .get(&Symbol::NONTERMINAL(production.head.clone()))
@@ -155,15 +166,25 @@ impl Parser {
                             };
 
                             if follow_set_contains {
-                                match symbol {
-                                    Symbol::TERMINAL(terminal) => {
-                                        state_.action.insert(
-                                            terminal.clone(),
-                                            Action::REDUCE(production.index),
-                                        );
+                                if let Symbol::TERMINAL(terminal) = symbol {
+                                    match state.action.get(terminal) {
+                                        Some(entry) => match entry {
+                                            Action::REDUCE(index) if index != &production.index => {
+                                                panic!("conflict")
+                                            }
+                                            Action::REDUCE(_) => {}
+                                            _ => {
+                                                panic!("conflict")
+                                            }
+                                        },
+                                        None => {
+                                            state.action.insert(
+                                                terminal.clone(),
+                                                Action::REDUCE(production.index),
+                                            );
+                                        }
                                     }
-                                    _ => {}
-                                };
+                                }
                             }
                         }
                     }
@@ -176,15 +197,28 @@ impl Parser {
                     );
                     if !goto.productions.is_empty() && is_item_in_collection {
                         let goto_state = state__.unwrap();
-                        let state_ = canonical_collection.get_mut(state.state).expect("");
+                        let state = canonical_collection.get_mut(state_clone.state).expect("");
                         match symbol {
                             Symbol::TERMINAL(terminal) => {
-                                state_
+                                if let Some(entry) = state.action.get(terminal) {
+                                    match entry {
+                                        Action::SHIFT(state_index)
+                                            if state_index != &goto_state.state =>
+                                        {
+                                            panic!("conflict")
+                                        }
+                                        Action::SHIFT(_) => {}
+                                        _ => {
+                                            panic!("conflict")
+                                        }
+                                    }
+                                }
+                                state
                                     .action
                                     .insert(terminal.clone(), Action::SHIFT(goto_state.state));
                             }
                             Symbol::NONTERMINAL(non_terminal) => {
-                                state_.goto.insert(non_terminal.clone(), goto_state.state);
+                                state.goto.insert(non_terminal.clone(), goto_state.state);
                             }
                             Symbol::NONE => {}
                         }
@@ -192,15 +226,28 @@ impl Parser {
                     if !goto.productions.is_empty() && !is_item_in_collection {
                         goto.state = canonical_collection.len();
                         canonical_collection.push(goto.clone());
-                        let state_ = canonical_collection.get_mut(state.state).expect("");
+                        let state = canonical_collection.get_mut(state_clone.state).expect("");
                         match symbol {
                             Symbol::TERMINAL(terminal) => {
-                                state_
+                                if let Some(entry) = state.action.get(terminal) {
+                                    match entry {
+                                        Action::SHIFT(state_index)
+                                            if state_index != &goto.state =>
+                                        {
+                                            panic!("conflict")
+                                        }
+                                        Action::SHIFT(_) => {}
+                                        _ => {
+                                            panic!("conflict")
+                                        }
+                                    }
+                                }
+                                state
                                     .action
                                     .insert(terminal.clone(), Action::SHIFT(goto.state));
                             }
                             Symbol::NONTERMINAL(non_terminal) => {
-                                state_.goto.insert(non_terminal.clone(), goto.state);
+                                state.goto.insert(non_terminal.clone(), goto.state);
                             }
                             Symbol::NONE => {}
                         }
@@ -208,8 +255,14 @@ impl Parser {
                 }
             }
             if canonical_clone.len() == canonical_collection.len() {
+                println!(
+                    "clone len {} coll len {}",
+                    canonical_clone.len(),
+                    canonical_collection.len()
+                );
                 break;
             }
+            state_index += 1;
         }
         self.lr0_automaton = canonical_collection;
     }

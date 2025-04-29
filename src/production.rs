@@ -21,4 +21,7 @@ impl Production {
     pub fn advance_cursor(&mut self) {
         self.cursor_pos += 1;
     }
+    pub fn is_augment_production(&self) -> bool {
+        self.head == String::from("S'")
+    }
 }
