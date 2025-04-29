@@ -1,24 +1,18 @@
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Debug,
-    hash::Hash,
-};
+use std::collections::{HashMap, HashSet};
 
-use crate::{production::Production, symbol::unique_symbols, terminal::Terminal, Symbol};
+use crate::{production::Production, symbol::unique_symbols, Symbol};
 
-pub fn compute_first_set<T: PartialEq + Clone + Eq + Debug + Hash + Terminal>(
-    productions: &Vec<Production<T>>,
-) -> HashMap<Symbol<T>, HashSet<T>> {
+pub fn compute_first_set(productions: &Vec<Production>) -> HashMap<Symbol, HashSet<String>> {
     let symbols = unique_symbols(productions);
 
-    let mut first_map: HashMap<Symbol<T>, HashSet<T>> = HashMap::new();
+    let mut first_map: HashMap<Symbol, HashSet<String>> = HashMap::new();
     for symbol in symbols.iter() {
         match symbol {
             Symbol::TERMINAL(terminal) => {
                 first_map.insert(symbol.clone(), HashSet::from([terminal.clone()]));
             }
             Symbol::NONTERMINAL(non_terminal) => {
-                let filter_by_head: Vec<T> = productions
+                let filter_by_head: Vec<String> = productions
                     .iter()
                     .filter(|prod| prod.head.eq(non_terminal))
                     .filter_map(|prod| match prod.body.first().unwrap() {

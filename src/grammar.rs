@@ -2,18 +2,15 @@
 
 use std::fmt::Debug;
 
-use crate::{production::Production, terminal::Terminal};
+use crate::production::Production;
 
 #[derive(Debug)]
-pub struct Grammar<T>
-where
-    T: Clone + PartialEq + Eq + Debug + Terminal,
-{
-    pub productions: Vec<Production<T>>,
+pub struct Grammar {
+    pub productions: Vec<Production>,
 }
 
-impl<T: Clone + Debug + PartialEq + Eq + Terminal> Grammar<T> {
-    pub fn new() -> Grammar<T> {
+impl Grammar {
+    pub fn new() -> Grammar {
         Grammar {
             productions: Vec::new(),
         }
@@ -24,16 +21,17 @@ impl<T: Clone + Debug + PartialEq + Eq + Terminal> Grammar<T> {
 macro_rules! grammar {
     (
         $terminal_type:ident,
-        $($head:ident -> $($terminal:path $([$non_terminal:ident])*)|+);*
+        $($head:ident -> $($([$terminal:expr])? $($non_terminal1:ident $non_terminal2:ident)?)|+);+
     ) => {{
-        let mut grammar: Grammar<$terminal_type> = Grammar::new();
+        let mut grammar: Grammar= Grammar::new();
         $({
-            $({let mut body_ : Vec<Symbol<$terminal_type>> = Vec::new();
-            body_.push(Symbol::TERMINAL($terminal));
+            $({let mut body_ : Vec<Symbol> = Vec::new();
+            $(body_.push(Symbol::TERMINAL($terminal.to_string()));)?
             $(
-                body_.push(Symbol::NONTERMINAL(stringify!($non_terminal).to_string()));
-            )*
-            let production:Production<$terminal_type> = Production {
+                body_.push(Symbol::NONTERMINAL(stringify!($non_terminal1).to_string()));
+                body_.push(Symbol::NONTERMINAL(stringify!($non_terminal2).to_string()));
+            )?
+            let production:Production = Production {
                 head: stringify!($head).to_string(),
                 body: body_,
                 cursor_pos: 0,

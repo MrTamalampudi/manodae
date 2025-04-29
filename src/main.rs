@@ -20,32 +20,40 @@ pub mod terminal;
 pub enum TokenType {
     A,
     B,
-    C,
+    C(String),
     EOF,
 }
 
 impl Terminal for TokenType {
-    fn get_ending_token() -> TokenType {
-        TokenType::EOF
+    fn get_ending_token() -> String {
+        TokenType::EOF.to_string()
+    }
+    fn to_string(&self) -> String {
+        match self {
+            TokenType::A => String::from("A"),
+            TokenType::B => String::from("B"),
+            TokenType::C(_) => String::from("C"),
+            TokenType::EOF => String::from("EOF"),
+        }
+    }
+}
+
+impl Terminal for String {
+    fn get_ending_token() -> String {
+        TokenType::get_ending_token()
     }
 }
 
 fn main() {
-    let grammar: Grammar<TokenType> = crate::grammar!(
+    let dummy = String::new();
+    let grammar: Grammar = crate::grammar!(
         TokenType,
-        S -> TokenType::A [E];
-        E -> TokenType::B [Z] [Z];
-        Z -> TokenType::C
+        S -> A B;
+        A -> [TokenType::A];
+        B -> [TokenType::B]
     );
-    //println!("{:#?}", grammar.productions);
     let mut p = Parser::new(grammar.productions);
     p.compute_lr0_items();
-    let input = vec![
-        TokenType::A,
-        TokenType::B,
-        TokenType::C,
-        TokenType::C,
-        TokenType::EOF,
-    ];
+    let input = vec![TokenType::A, TokenType::A, TokenType::EOF];
     p.parse(input);
 }

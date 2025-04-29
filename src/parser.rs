@@ -11,26 +11,24 @@ use crate::state::State;
 use crate::symbol::unique_symbols;
 use crate::terminal::Terminal;
 use crate::Symbol;
+use crate::TokenType;
 
 #[derive(Debug)]
-pub struct Parser<T>
-where
-    T: PartialEq + Clone + Eq + Debug + Terminal,
-{
-    pub productions: Vec<Production<T>>,
-    pub lr0_automaton: Vec<State<T>>,
-    pub symbols: Vec<Symbol<T>>, //every gramar symbol that exists in grammar
-    pub follow_set: HashMap<Symbol<T>, HashSet<T>>,
-    pub first_set: HashMap<Symbol<T>, HashSet<T>>,
+pub struct Parser {
+    pub productions: Vec<Production>,
+    pub lr0_automaton: Vec<State>,
+    pub symbols: Vec<Symbol>, //every gramar symbol that exists in grammar
+    pub follow_set: HashMap<Symbol, HashSet<String>>,
+    pub first_set: HashMap<Symbol, HashSet<String>>,
 }
 
-impl<T: PartialEq + Clone + Eq + Debug + Terminal + Hash> Parser<T> {
-    pub fn new(productions: Vec<Production<T>>) -> Parser<T> {
+impl Parser {
+    pub fn new(productions: Vec<Production>) -> Parser {
         let mut productions_ = productions.clone();
 
         //creating augmented production
         let start_symbol = productions_.first().unwrap();
-        let augmented_production: Production<T> = Production {
+        let augmented_production: Production = Production {
             head: String::from("S'"),
             body: vec![Symbol::NONTERMINAL(start_symbol.head.clone())],
             cursor_pos: 0,
@@ -39,7 +37,7 @@ impl<T: PartialEq + Clone + Eq + Debug + Terminal + Hash> Parser<T> {
         productions_.insert(0, augmented_production);
 
         //collect all grammar symbols without duplicates
-        let symbols: Vec<Symbol<T>> = unique_symbols(&productions_);
+        let symbols: Vec<Symbol> = unique_symbols(&productions_);
 
         let first_set = compute_first_set(&productions_);
         let follow_set = compute_follow_set(&productions_);
@@ -53,7 +51,7 @@ impl<T: PartialEq + Clone + Eq + Debug + Terminal + Hash> Parser<T> {
         }
     }
 
-    pub fn closure(&self, productions: &mut Vec<Production<T>>) {
+    pub fn closure(&self, productions: &mut Vec<Production>) {
         let mut symbols: Vec<String> = vec![];
         loop {
             let productions_ = productions.clone();
@@ -74,7 +72,7 @@ impl<T: PartialEq + Clone + Eq + Debug + Terminal + Hash> Parser<T> {
                     symbols.push(symbol.clone());
                 }
 
-                let matched_head_productions: Vec<Production<T>> = self
+                let matched_head_productions: Vec<Production> = self
                     .productions
                     .iter()
                     .cloned()
@@ -92,7 +90,7 @@ impl<T: PartialEq + Clone + Eq + Debug + Terminal + Hash> Parser<T> {
 
     //GOTO(Item,Symbol) is defined to be the closure of the set of
     //all items [A -> aX.B] such that [A -> a.XB] is in I {ref:ullman dragon book}
-    pub fn goto(&self, productions: &Vec<Production<T>>, symbol: &Symbol<T>) -> State<T> {
+    pub fn goto(&self, productions: &Vec<Production>, symbol: &Symbol) -> State {
         let mut goto_productions = productions
             .iter()
             .filter(|production| match production.next_symbol() {
@@ -126,7 +124,7 @@ impl<T: PartialEq + Clone + Eq + Debug + Terminal + Hash> Parser<T> {
             action: HashMap::new(),
             goto: HashMap::new(),
         };
-        let mut canonical_collection: Vec<State<T>> = vec![initial_state];
+        let mut canonical_collection: Vec<State> = vec![initial_state];
         loop {
             //this clone is for because we cant update the vector which is already in use
             let mut canonical_clone = canonical_collection.clone();
@@ -137,12 +135,11 @@ impl<T: PartialEq + Clone + Eq + Debug + Terminal + Hash> Parser<T> {
                     if symbol.is_terminal() {
                         for production in reduce_productions.iter() {
                             let state_ = canonical_collection.get_mut(state.state).expect("");
+                            //eofff
                             if production.head == String::from("S'")
-                                && symbol.eq(&Symbol::TERMINAL(T::get_ending_token()))
+                                && symbol.eq(&Symbol::TERMINAL(String::from("EOF")))
                             {
-                                state_
-                                    .action
-                                    .insert(T::get_ending_token().clone(), Action::ACCEPT);
+                                state_.action.insert(String::from("EOF"), Action::ACCEPT);
                             }
                             if production.head == String::from("S'") {
                                 continue;
@@ -217,19 +214,19 @@ impl<T: PartialEq + Clone + Eq + Debug + Terminal + Hash> Parser<T> {
         self.lr0_automaton = canonical_collection;
     }
 
-    pub fn parse(&self, input: Vec<T>) {
-        let mut stack: Vec<State<T>> = Vec::new();
+    pub fn parse(&self, input: Vec<TokenType>) {
+        let mut stack: Vec<State> = Vec::new();
         let mut input_iter = input.iter();
-        let mut a = input_iter.next().unwrap();
+        let mut a = input_iter.next().unwrap().to_string();
         let mut top_state = self.lr0_automaton.first().unwrap();
         stack.push(top_state.clone());
         loop {
             top_state = stack.last().unwrap();
-            if top_state.action.contains_key(a) {
-                match top_state.action.get(a).unwrap() {
+            if top_state.action.contains_key(&a) {
+                match top_state.action.get(&a).unwrap() {
                     Action::SHIFT(state) => {
                         stack.push(self.lr0_automaton.get(state.clone()).unwrap().clone());
-                        a = input_iter.next().unwrap();
+                        a = input_iter.next().unwrap().to_string();
                     }
                     Action::REDUCE(production) => {
                         let production_ = self.productions.get(production.clone()).unwrap();
@@ -247,15 +244,17 @@ impl<T: PartialEq + Clone + Eq + Debug + Terminal + Hash> Parser<T> {
                     }
                     _ => {}
                 }
+            } else {
+                panic!("some token error");
             }
         }
     }
 }
 
-fn is_items_in_canonical_collection<T: Clone + Eq + Debug + Terminal>(
-    states: Vec<State<T>>,
-    item: &Vec<Production<T>>,
-) -> (bool, Option<State<T>>) {
+fn is_items_in_canonical_collection(
+    states: Vec<State>,
+    item: &Vec<Production>,
+) -> (bool, Option<State>) {
     let mut contains = false;
     for state in states.iter() {
         if state.productions.len() != item.len() {
@@ -276,19 +275,19 @@ fn is_items_in_canonical_collection<T: Clone + Eq + Debug + Terminal>(
     (contains, None)
 }
 
-fn compute_shift_reduce_productions<T: Clone + Eq + Debug + Terminal>(
-    productions: &Vec<Production<T>>,
-) -> (Vec<Production<T>>, Vec<Production<T>>) {
+fn compute_shift_reduce_productions(
+    productions: &Vec<Production>,
+) -> (Vec<Production>, Vec<Production>) {
     let filter_by_dot_at_the_rightend =
-        |production: &Production<T>| production.cursor_pos == production.body.len();
+        |production: &Production| production.cursor_pos == production.body.len();
 
-    let reduce_productions: Vec<Production<T>> = productions
+    let reduce_productions: Vec<Production> = productions
         .iter()
         .cloned()
         .filter(filter_by_dot_at_the_rightend)
         .collect();
 
-    let shift_productions: Vec<Production<T>> = productions
+    let shift_productions: Vec<Production> = productions
         .iter()
         .cloned()
         .filter(|p| !filter_by_dot_at_the_rightend(p))
