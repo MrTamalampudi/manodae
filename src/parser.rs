@@ -6,6 +6,7 @@ use std::hash::Hash;
 use std::str::Matches;
 
 use crate::action::Action;
+use crate::conflict::ConflictType;
 use crate::first::compute_first_set;
 use crate::follow::compute_follow_set;
 use crate::production::Production;
@@ -23,6 +24,7 @@ pub struct Parser {
     pub symbols: Vec<Symbol>, //every gramar symbol that exists in grammar
     pub follow_set: HashMap<Symbol, HashSet<String>>,
     pub first_set: HashMap<Symbol, HashSet<String>>,
+    pub conflicts: bool,
 }
 
 impl Parser {
@@ -51,6 +53,7 @@ impl Parser {
             symbols,
             first_set,
             follow_set,
+            conflicts: false,
         }
     }
 
@@ -113,6 +116,7 @@ impl Parser {
             transition_symbol: symbol.clone(),
             action: HashMap::new(),
             goto: HashMap::new(),
+            conflicts: HashMap::new(),
         }
     }
 
@@ -126,6 +130,7 @@ impl Parser {
             transition_symbol: Symbol::NONE,
             action: HashMap::new(),
             goto: HashMap::new(),
+            conflicts: HashMap::new(),
         };
         let mut canonical_collection: Vec<State> = vec![initial_state];
         let mut state_index = 0;
@@ -145,7 +150,11 @@ impl Parser {
                             {
                                 if let Some(action) = state.action.get("EOF") {
                                     if !matches!(action, Action::ACCEPT) {
-                                        panic!("conflict");
+                                        self.conflicts = true;
+                                        state.conflicts.insert(
+                                            String::from("EOF"),
+                                            ConflictType::RR([action.clone(), Action::ACCEPT]),
+                                        );
                                     }
                                 } else {
                                     state.action.insert(String::from("EOF"), Action::ACCEPT);
@@ -170,7 +179,14 @@ impl Parser {
                                     match state.action.get(terminal) {
                                         Some(entry) => match entry {
                                             Action::REDUCE(index) if index != &production.index => {
-                                                panic!("conflict")
+                                                self.conflicts = true;
+                                                state.conflicts.insert(
+                                                    terminal.clone(),
+                                                    ConflictType::SR([
+                                                        entry.clone(),
+                                                        Action::REDUCE(production.index),
+                                                    ]),
+                                                );
                                             }
                                             Action::REDUCE(_) => {}
                                             _ => {
@@ -208,6 +224,16 @@ impl Parser {
                                             panic!("conflict")
                                         }
                                         Action::SHIFT(_) => {}
+                                        Action::REDUCE(_) => {
+                                            self.conflicts = true;
+                                            state.conflicts.insert(
+                                                terminal.clone(),
+                                                ConflictType::SR([
+                                                    entry.clone(),
+                                                    Action::SHIFT(goto_state.state),
+                                                ]),
+                                            );
+                                        }
                                         _ => {
                                             panic!("conflict")
                                         }
@@ -234,9 +260,19 @@ impl Parser {
                                         Action::SHIFT(state_index)
                                             if state_index != &goto.state =>
                                         {
-                                            panic!("conflict")
+                                            self.conflicts = true;
                                         }
                                         Action::SHIFT(_) => {}
+                                        Action::REDUCE(_) => {
+                                            self.conflicts = true;
+                                            state.conflicts.insert(
+                                                terminal.clone(),
+                                                ConflictType::SR([
+                                                    entry.clone(),
+                                                    Action::SHIFT(goto.state),
+                                                ]),
+                                            );
+                                        }
                                         _ => {
                                             panic!("conflict")
                                         }
@@ -298,7 +334,8 @@ impl Parser {
                     _ => {}
                 }
             } else {
-                panic!("some token error");
+                println!("expected {:#?} actual {:#?}", top_state.action.keys(), a);
+                break;
             }
         }
     }

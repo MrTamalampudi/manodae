@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Debug};
 
-use crate::{action::Action, production::Production, symbol::Symbol};
+use crate::{action::Action, conflict::ConflictType, production::Production, symbol::Symbol};
 
 #[derive(Debug, Clone)]
 pub struct State {
@@ -9,4 +9,5 @@ pub struct State {
     pub transition_symbol: Symbol,
     pub action: HashMap<String, Action>,
     pub goto: HashMap<String, usize>,
+    pub conflicts: HashMap<String, ConflictType>,
 }

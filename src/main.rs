@@ -7,6 +7,7 @@ use symbol::Symbol;
 use terminal::Terminal;
 
 pub mod action;
+pub mod conflict;
 pub mod first;
 pub mod follow;
 pub mod grammar;
@@ -48,15 +49,19 @@ fn main() {
     let dummy = String::new();
     let grammar: Grammar = crate::grammar!(
         TokenType,
-        S -> [TokenType::A,TokenType::B] A B
-        |[TokenType::B] B C;
+        S -> A B
+        |B C;
         A -> [TokenType::A];
         B -> [TokenType::A];
         C -> [TokenType::B]
     );
     let mut p = Parser::new(grammar.productions);
     p.compute_lr0_items();
-    println!("{:#?}", p.lr0_automaton);
-    // let input = vec![TokenType::A, TokenType::A, TokenType::EOF];
-    // p.parse(input);
+    //println!("{:#?}", p.conflicts);
+    let input = vec![
+        TokenType::A,
+        TokenType::C("dumm".to_string()),
+        TokenType::EOF,
+    ];
+    p.parse(input);
 }
