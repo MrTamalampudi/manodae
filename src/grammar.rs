@@ -21,16 +21,15 @@ impl Grammar {
 macro_rules! grammar {
     (
         $terminal_type:ident,
-        $($head:ident -> $($([$($terminal:expr),*])? $($non_terminal1:ident $non_terminal2:ident)?)|+);+
+        $($head:ident -> $($([$($terminal:expr),*])? $($non_terminal:ident)*)|+);+
     ) => {{
         let mut grammar: Grammar= Grammar::new();
         $({
             $({let mut body_ : Vec<Symbol> = Vec::new();
             $($(body_.push(Symbol::TERMINAL($terminal.to_string()));),*)?
             $(
-                body_.push(Symbol::NONTERMINAL(stringify!($non_terminal1).to_string()));
-                body_.push(Symbol::NONTERMINAL(stringify!($non_terminal2).to_string()));
-            )?
+                body_.push(Symbol::NONTERMINAL(stringify!($non_terminal).to_string()));
+            )*
             let production:Production = Production {
                 head: stringify!($head).to_string(),
                 body: body_,
