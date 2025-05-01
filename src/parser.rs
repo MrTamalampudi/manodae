@@ -303,7 +303,7 @@ impl Parser {
         self.lr0_automaton = canonical_collection;
     }
 
-    pub fn parse(&self, input: Vec<TokenType>) {
+    pub fn parse<T: Terminal>(&self, input: Vec<T>) {
         let mut stack: Vec<State> = Vec::new();
         let mut input_iter = input.iter();
         let mut a = input_iter.next().unwrap().to_string();

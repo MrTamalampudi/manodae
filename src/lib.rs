@@ -39,12 +39,6 @@ impl Terminal for TokenType {
     }
 }
 
-impl Terminal for String {
-    fn get_ending_token() -> String {
-        TokenType::get_ending_token()
-    }
-}
-
 fn main() {
     let dummy = String::new();
     let grammar: Grammar = crate::grammar!(
