@@ -11,7 +11,7 @@ pub mod conflict;
 pub mod first;
 pub mod follow;
 pub mod grammar;
-mod parser;
+pub mod parser;
 pub mod production;
 pub mod state;
 pub mod symbol;
