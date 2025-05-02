@@ -1,6 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{production::Production, symbol::unique_symbols, Symbol};
+use crate::{
+    production::{self, Production},
+    symbol::unique_symbols,
+    terminal, Symbol,
+};
 
 pub fn compute_first_set(productions: &Vec<Production>) -> HashMap<Symbol, HashSet<String>> {
     let symbols = unique_symbols(productions);
@@ -12,22 +16,35 @@ pub fn compute_first_set(productions: &Vec<Production>) -> HashMap<Symbol, HashS
                 first_map.insert(symbol.clone(), HashSet::from([terminal.clone()]));
             }
             Symbol::NONTERMINAL(non_terminal) => {
-                let filter_by_head: Vec<String> = productions
-                    .iter()
-                    .filter(|prod| prod.head.eq(non_terminal))
-                    .filter_map(|prod| match prod.body.first().unwrap() {
-                        Symbol::TERMINAL(terminal) => Some(terminal.clone()),
-                        _ => None,
-                    })
-                    .collect();
-
-                first_map.insert(
-                    symbol.clone(),
-                    HashSet::from_iter(filter_by_head.iter().cloned()),
-                );
+                let s_set = first_recursive(productions, non_terminal);
+                first_map.insert(symbol.clone(), HashSet::from_iter(s_set.iter().cloned()));
             }
             Symbol::NONE => continue,
         }
     }
     first_map
+}
+
+fn first_recursive(productions: &Vec<Production>, non_terminal: &String) -> HashSet<String> {
+    let filter_by_non_terminal: Vec<&Production> = productions
+        .iter()
+        .filter(|p| p.head.eq(non_terminal))
+        .collect();
+
+    let mut first_set: HashSet<String> = HashSet::new();
+
+    for production in filter_by_non_terminal.iter() {
+        let first_symbol = production.body.first().unwrap();
+        match first_symbol {
+            Symbol::TERMINAL(terminal) => {
+                first_set.insert(terminal.clone());
+            }
+            Symbol::NONTERMINAL(non_terminal) => {
+                first_set.extend(first_recursive(productions, non_terminal));
+            }
+            Symbol::NONE => continue,
+        };
+    }
+
+    first_set
 }
