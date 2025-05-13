@@ -27,9 +27,9 @@ pub enum TokenType {
 
 impl Terminal for TokenType {
     fn get_ending_token() -> String {
-        TokenType::EOF.to_string()
+        TokenType::EOF.to_string_c()
     }
-    fn to_string(&self) -> String {
+    fn to_string_c(&self) -> String {
         match self {
             TokenType::A => String::from("A"),
             TokenType::B => String::from("B"),

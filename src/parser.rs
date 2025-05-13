@@ -133,10 +133,10 @@ impl Parser {
             conflicts: HashMap::new(),
         };
         let mut canonical_collection: Vec<State> = vec![initial_state];
-        let mut state_index = 0;
         loop {
             //this clone is for because we cant update the vector which is already in use
             let mut canonical_clone = canonical_collection.clone();
+            //this loop is uneccesary it can be optimised
             for state_clone in canonical_clone.iter() {
                 let (reduce_productions, shift_productions) =
                     compute_shift_reduce_productions(&state_clone.productions);
@@ -291,31 +291,27 @@ impl Parser {
                 }
             }
             if canonical_clone.len() == canonical_collection.len() {
-                println!(
-                    "clone len {} coll len {}",
-                    canonical_clone.len(),
-                    canonical_collection.len()
-                );
                 break;
             }
-            state_index += 1;
         }
         self.lr0_automaton = canonical_collection;
     }
 
-    pub fn parse<T: Terminal>(&self, input: Vec<T>) {
+    pub fn parse<T: Terminal + Debug>(&self, input: Vec<T>) {
         let mut stack: Vec<State> = Vec::new();
         let mut input_iter = input.iter();
-        let mut a = input_iter.next().unwrap().to_string();
+        let mut current_input = input_iter.next().unwrap();
+        let mut current_input_string = current_input.to_string_c();
         let mut top_state = self.lr0_automaton.first().unwrap();
         stack.push(top_state.clone());
         loop {
             top_state = stack.last().unwrap();
-            if top_state.action.contains_key(&a) {
-                match top_state.action.get(&a).unwrap() {
+
+            if top_state.action.contains_key(&current_input_string) {
+                match top_state.action.get(&current_input_string).unwrap() {
                     Action::SHIFT(state) => {
                         stack.push(self.lr0_automaton.get(state.clone()).unwrap().clone());
-                        a = input_iter.next().unwrap().to_string();
+                        current_input_string = input_iter.next().unwrap().to_string_c();
                     }
                     Action::REDUCE(production) => {
                         let production_ = self.productions.get(production.clone()).unwrap();
@@ -334,8 +330,28 @@ impl Parser {
                     _ => {}
                 }
             } else {
-                println!("expected {:#?} actual {:#?}", top_state.action.keys(), a);
-                break;
+                //error recovery
+                //implement second method in this paper https://ieeexplore.ieee.org/document/6643853
+
+                //pop stack till transition symbol of top state is non_terminal
+                loop {
+                    stack.pop();
+                    top_state = stack.last().unwrap();
+                    if matches!(top_state.transition_symbol, Symbol::NONTERMINAL(_)) {
+                        break;
+                    }
+                }
+                //skip input till input character contains in followset of ...
+                //top_state transition symbol
+                let error_production = &top_state.transition_symbol;
+                let error_production_follow_set = self.follow_set.get(error_production).unwrap();
+                loop {
+                    if error_production_follow_set.contains(&current_input_string) {
+                        break;
+                    } else {
+                        current_input_string = input_iter.next().unwrap().to_string_c();
+                    }
+                }
             }
         }
     }
