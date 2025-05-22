@@ -7,15 +7,15 @@ use std::str::Matches;
 
 use crate::action::Action;
 use crate::conflict::ConflictType;
+use crate::error::ParseError;
 use crate::first::compute_first_set;
 use crate::follow::compute_follow_set;
 use crate::production::Production;
 use crate::state::State;
 use crate::symbol::unique_symbols;
+use crate::symbol::Symbol;
 use crate::terminal;
 use crate::terminal::Terminal;
-use crate::Symbol;
-use crate::TokenType;
 
 #[derive(Debug)]
 pub struct Parser {
@@ -72,7 +72,7 @@ impl Parser {
 
                 //this is for not to add already added productions
                 //removing this block causes infinite loop
-                if symbols.contains(symbol) {
+                if symbols.contains(&symbol) {
                     continue;
                 } else {
                     symbols.push(symbol.clone());
@@ -97,7 +97,7 @@ impl Parser {
     //GOTO(Item,Symbol) is defined to be the closure of the set of
     //all items [A -> aX.B] such that [A -> a.XB] is in I {ref:ullman dragon book}
     pub fn goto(&self, productions: &Vec<Production>, symbol: &Symbol) -> State {
-        let mut goto_productions = productions
+        let mut goto_productions: Vec<Production> = productions
             .iter()
             .filter(|production| match production.next_symbol() {
                 Some(symbol_) => symbol.eq(symbol_),
@@ -109,11 +109,13 @@ impl Parser {
                 temp
             })
             .collect();
+        let transition_productions = goto_productions.clone();
         self.closure(&mut goto_productions);
         State {
             state: 0, //Dont forget to update this according to the index in canonical collection
             productions: goto_productions,
             transition_symbol: symbol.clone(),
+            transition_productions: transition_productions,
             action: HashMap::new(),
             goto: HashMap::new(),
             conflicts: HashMap::new(),
@@ -128,6 +130,7 @@ impl Parser {
             state: 0,
             productions: state1,
             transition_symbol: Symbol::NONE,
+            transition_productions: vec![augmented_grammar.clone()],
             action: HashMap::new(),
             goto: HashMap::new(),
             conflicts: HashMap::new(),
@@ -297,12 +300,24 @@ impl Parser {
         self.lr0_automaton = canonical_collection;
     }
 
-    pub fn parse<T: Terminal + Debug>(&self, input: Vec<T>) {
+    pub fn parse<T: Terminal + Debug + Clone>(
+        &self,
+        input: Vec<T>,
+        errors: &mut Vec<ParseError<T>>,
+    ) {
         let mut stack: Vec<State> = Vec::new();
         let mut input_iter = input.iter();
         let mut current_input = input_iter.next().unwrap();
+        let mut previous_input = current_input;
         let mut current_input_string = current_input.to_string_c();
         let mut top_state = self.lr0_automaton.first().unwrap();
+
+        // let mut next_input = || {
+        //     previous_input = current_input;
+        //     current_input = input_iter.next().unwrap();
+        //     current_input.to_string_c()
+        // };
+
         stack.push(top_state.clone());
         loop {
             top_state = stack.last().unwrap();
@@ -311,7 +326,9 @@ impl Parser {
                 match top_state.action.get(&current_input_string).unwrap() {
                     Action::SHIFT(state) => {
                         stack.push(self.lr0_automaton.get(state.clone()).unwrap().clone());
-                        current_input_string = input_iter.next().unwrap().to_string_c();
+                        previous_input = current_input;
+                        current_input = input_iter.next().unwrap();
+                        current_input_string = current_input.to_string_c();
                     }
                     Action::REDUCE(production) => {
                         let production_ = self.productions.get(production.clone()).unwrap();
@@ -330,28 +347,71 @@ impl Parser {
                     _ => {}
                 }
             } else {
+                println!("expected {:#?}", top_state.action);
+
+                let mut skip_check = 0;
+                let errorToken = current_input;
                 //error recovery
                 //implement second method in this paper https://ieeexplore.ieee.org/document/6643853
 
                 //pop stack till transition symbol of top state is non_terminal
+                let deduced_production_head = top_state
+                    .transition_productions
+                    .iter()
+                    .cloned()
+                    .map(|production| production.head)
+                    .collect::<Vec<_>>();
+                let mut deduced_head: Option<String> = None;
                 loop {
                     stack.pop();
                     top_state = stack.last().unwrap();
-                    if matches!(top_state.transition_symbol, Symbol::NONTERMINAL(_)) {
+                    let mut contains = false;
+                    for head in deduced_production_head.iter() {
+                        if top_state.goto.contains_key(head) {
+                            contains = true;
+                            deduced_head = Some(head.clone());
+                            break;
+                        }
+                    }
+                    if contains {
                         break;
                     }
+                    // if matches!(top_state.transition_symbol, Symbol::NONTERMINAL(_)) {
+                    //     break;
+                    // }
                 }
+                println!("head {:#?}", deduced_head);
                 //skip input till input character contains in followset of ...
                 //top_state transition symbol
-                let error_production = &top_state.transition_symbol;
-                let error_production_follow_set = self.follow_set.get(error_production).unwrap();
+                let error_production_follow_set = self
+                    .follow_set
+                    .get(&Symbol::NONTERMINAL(deduced_head.unwrap()))
+                    .unwrap();
                 loop {
+                    println!("current :{current_input_string}");
                     if error_production_follow_set.contains(&current_input_string) {
+                        if skip_check == 0 {
+                            errors.push(ParseError {
+                                token: previous_input.clone(),
+                                message: String::from("value"),
+                                productionEnd: true,
+                            });
+                        } else {
+                            errors.push(ParseError {
+                                token: errorToken.clone(),
+                                message: String::from("value"),
+                                productionEnd: false,
+                            });
+                        }
                         break;
                     } else {
-                        current_input_string = input_iter.next().unwrap().to_string_c();
+                        skip_check += 1;
+                        previous_input = current_input;
+                        current_input = input_iter.next().unwrap();
+                        current_input_string = current_input.to_string_c();
                     }
                 }
+                println!("skip check {skip_check}");
             }
         }
     }

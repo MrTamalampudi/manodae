@@ -2,8 +2,8 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     production::{self, Production},
-    symbol::unique_symbols,
-    terminal, Symbol,
+    symbol::{unique_symbols, Symbol},
+    terminal,
 };
 
 pub fn compute_first_set(productions: &Vec<Production>) -> HashMap<Symbol, HashSet<String>> {

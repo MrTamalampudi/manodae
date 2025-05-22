@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use crate::Symbol;
+use crate::symbol::Symbol;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Production {

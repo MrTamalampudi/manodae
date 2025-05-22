@@ -1,6 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{first::compute_first_set, production::Production, symbol::unique_symbols, Symbol};
+use crate::{
+    first::compute_first_set,
+    production::Production,
+    symbol::{unique_symbols, Symbol},
+};
 
 pub fn compute_follow_set(productions: &Vec<Production>) -> HashMap<Symbol, HashSet<String>> {
     let symbols: Vec<Symbol> = unique_symbols(productions);
