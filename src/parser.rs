@@ -341,20 +341,16 @@ impl Parser {
                         stack.push(self.lr0_automaton.get(goto_state.clone()).unwrap().clone());
                     }
                     Action::ACCEPT => {
-                        println!("hell yeah");
                         break;
                     }
                     _ => {}
                 }
             } else {
-                println!("expected {:#?}", top_state.action);
-
                 let mut skip_check = 0;
                 let errorToken = current_input;
                 //error recovery
                 //implement second method in this paper https://ieeexplore.ieee.org/document/6643853
 
-                //pop stack till transition symbol of top state is non_terminal
                 let deduced_production_head = top_state
                     .transition_productions
                     .iter()
@@ -376,11 +372,7 @@ impl Parser {
                     if contains {
                         break;
                     }
-                    // if matches!(top_state.transition_symbol, Symbol::NONTERMINAL(_)) {
-                    //     break;
-                    // }
                 }
-                println!("head {:#?}", deduced_head);
                 //skip input till input character contains in followset of ...
                 //top_state transition symbol
                 let error_production_follow_set = self
@@ -388,7 +380,6 @@ impl Parser {
                     .get(&Symbol::NONTERMINAL(deduced_head.unwrap()))
                     .unwrap();
                 loop {
-                    println!("current :{current_input_string}");
                     if error_production_follow_set.contains(&current_input_string) {
                         if skip_check == 0 {
                             errors.push(ParseError {
@@ -411,7 +402,6 @@ impl Parser {
                         current_input_string = current_input.to_string_c();
                     }
                 }
-                println!("skip check {skip_check}");
             }
         }
     }
