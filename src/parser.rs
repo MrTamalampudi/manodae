@@ -38,6 +38,7 @@ impl Parser {
             body: vec![Symbol::NONTERMINAL(start_symbol.head.clone())],
             cursor_pos: 0,
             index: 0,
+            error_message: None,
         };
         productions_.insert(0, augmented_production);
 
@@ -312,12 +313,6 @@ impl Parser {
         let mut current_input_string = current_input.to_string_c();
         let mut top_state = self.lr0_automaton.first().unwrap();
 
-        // let mut next_input = || {
-        //     previous_input = current_input;
-        //     current_input = input_iter.next().unwrap();
-        //     current_input.to_string_c()
-        // };
-
         stack.push(top_state.clone());
         loop {
             top_state = stack.last().unwrap();
@@ -346,26 +341,23 @@ impl Parser {
                     _ => {}
                 }
             } else {
-                let mut skip_check = 0;
-                let errorToken = current_input;
+                let mut input_symbol_skip_count = 0;
+                let error_token = current_input;
                 //error recovery
                 //implement second method in this paper https://ieeexplore.ieee.org/document/6643853
 
-                let deduced_production_head = top_state
-                    .transition_productions
-                    .iter()
-                    .cloned()
-                    .map(|production| production.head)
-                    .collect::<Vec<_>>();
-                let mut deduced_head: Option<String> = None;
+                let mut error_message = counstruct_syntax_error_message(top_state);
+
+                let deduced_productions = top_state.transition_productions.clone();
+                let mut deduced_production: Option<Production> = None;
                 loop {
                     stack.pop();
                     top_state = stack.last().unwrap();
                     let mut contains = false;
-                    for head in deduced_production_head.iter() {
-                        if top_state.goto.contains_key(head) {
+                    for production in deduced_productions.iter() {
+                        if top_state.goto.contains_key(&production.head) {
                             contains = true;
-                            deduced_head = Some(head.clone());
+                            deduced_production = Some(production.clone());
                             break;
                         }
                     }
@@ -377,32 +369,57 @@ impl Parser {
                 //top_state transition symbol
                 let error_production_follow_set = self
                     .follow_set
-                    .get(&Symbol::NONTERMINAL(deduced_head.unwrap()))
+                    .get(&Symbol::NONTERMINAL(
+                        deduced_production.clone().unwrap().head,
+                    ))
                     .unwrap();
                 loop {
                     if error_production_follow_set.contains(&current_input_string) {
-                        if skip_check == 0 {
+                        //println!("error message:{:#?}", deduced_production);
+                        if deduced_production.clone().unwrap().error_message.is_some() {
+                            error_message =
+                                deduced_production.unwrap().error_message.unwrap().clone();
+                        }
+                        if input_symbol_skip_count == 0 {
                             errors.push(ParseError {
                                 token: previous_input.clone(),
-                                message: String::from("value"),
+                                message: error_message,
                                 productionEnd: true,
                             });
                         } else {
                             errors.push(ParseError {
-                                token: errorToken.clone(),
-                                message: String::from("value"),
+                                token: error_token.clone(),
+                                message: error_message,
                                 productionEnd: false,
                             });
                         }
                         break;
                     } else {
-                        skip_check += 1;
+                        input_symbol_skip_count += 1;
                         previous_input = current_input;
                         current_input = input_iter.next().unwrap();
                         current_input_string = current_input.to_string_c();
                     }
                 }
             }
+        }
+    }
+}
+
+fn counstruct_syntax_error_message(state: &State) -> String {
+    let action_keys: Vec<String> = state.action.keys().cloned().collect();
+    String::from("Expected ") + join_either_or(action_keys).as_str()
+}
+
+fn join_either_or(items: Vec<String>) -> String {
+    match items.len() {
+        0 => "".to_string(),
+        1 => items[0].clone(),
+        2 => format!("{} or {}", items[0], items[1]),
+        _ => {
+            let all_but_last = &items[..items.len() - 1];
+            let last = &items[items.len() - 1];
+            format!("{} or {}", all_but_last.join(", "), last)
         }
     }
 }

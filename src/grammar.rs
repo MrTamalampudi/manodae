@@ -21,7 +21,11 @@ impl Grammar {
 macro_rules! grammar {
     (
         $terminal_type:ident,
-        $($head:ident -> $($([$($terminal:expr),*])? $($non_terminal:ident)*)|+);+
+        $(
+            $head:ident -> $(
+                $([$($terminal:expr),*])? $($non_terminal:ident)* $({error:$error:literal})?
+            )|+
+        );+
     ) => {{
         let mut grammar: Grammar= Grammar::new();
         $({
@@ -30,12 +34,18 @@ macro_rules! grammar {
             $(
                 body_.push(Symbol::NONTERMINAL(stringify!($non_terminal).to_string()));
             )*
-            let production:Production = Production {
+            let mut production:Production = Production {
                 head: stringify!($head).to_string(),
                 body: body_,
                 cursor_pos: 0,
-                index: grammar.productions.len() + 1
+                index: grammar.productions.len() + 1,
+                error_message: None
             };
+            $(
+              if $error.to_string().len() > 0 {
+                  production.error_message = Some($error.to_string());
+              }
+            )?
             grammar.productions.push(production);})+
         })+
         grammar

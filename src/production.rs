@@ -8,6 +8,7 @@ pub struct Production {
     pub body: Vec<Symbol>,
     pub cursor_pos: usize,
     pub index: usize,
+    pub error_message: Option<String>,
 }
 
 impl Production {
