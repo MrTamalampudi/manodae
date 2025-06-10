@@ -1,6 +1,7 @@
 //cfg grammar should be in bnf format
 
 use std::fmt::Debug;
+use std::sync::Arc;
 
 use crate::production::Production;
 
@@ -23,7 +24,10 @@ macro_rules! grammar {
         $terminal_type:ident,
         $(
             $head:ident -> $(
-                $([$($terminal:expr),*])? $($non_terminal:ident)* $({error:$error:literal})?
+                $([$($terminal:expr),*])?
+                $($non_terminal:ident)*
+                $({error:$error:literal})?
+                $({action:|$arg1:ident| $expr:block})?
             )|+
         );+
     ) => {{
@@ -39,12 +43,16 @@ macro_rules! grammar {
                 body: body_,
                 cursor_pos: 0,
                 index: grammar.productions.len() + 1,
-                error_message: None
+                error_message: None,
+                action:None
             };
             $(
               if $error.to_string().len() > 0 {
                   production.error_message = Some($error.to_string());
               }
+            )?
+            $(
+                {production.action = Some(Arc::new(|$arg1| $expr))}
             )?
             grammar.productions.push(production);})+
         })+

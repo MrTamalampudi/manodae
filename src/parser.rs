@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::str::Matches;
+use std::sync::Arc;
 
 use crate::action::Action;
 use crate::conflict::ConflictType;
@@ -30,6 +31,7 @@ pub struct Parser {
 impl Parser {
     pub fn new(productions: Vec<Production>) -> Parser {
         let mut productions_ = productions.clone();
+        let dummy = vec![1, 2];
 
         //creating augmented production
         let start_symbol = productions_.first().unwrap();
@@ -39,7 +41,9 @@ impl Parser {
             cursor_pos: 0,
             index: 0,
             error_message: None,
+            action: Some(Arc::new(|dummy| println!("msdian"))),
         };
+
         productions_.insert(0, augmented_production);
 
         //collect all grammar symbols without duplicates
@@ -327,6 +331,10 @@ impl Parser {
                     }
                     Action::REDUCE(production) => {
                         let production_ = self.productions.get(production.clone()).unwrap();
+                        match &production_.action {
+                            Some(actionaa) => (actionaa.as_ref())(vec![1, 2]),
+                            None => {}
+                        };
                         let pop_len = production_.body.len();
                         for _ in 0..pop_len {
                             stack.pop();
