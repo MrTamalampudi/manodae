@@ -6,7 +6,7 @@ use crate::{
     terminal,
 };
 
-pub fn compute_first_set(productions: &Vec<Production>) -> HashMap<Symbol, HashSet<String>> {
+pub fn compute_first_set<T>(productions: &Vec<Production<T>>) -> HashMap<Symbol, HashSet<String>> {
     let symbols = unique_symbols(productions);
 
     let mut first_map: HashMap<Symbol, HashSet<String>> = HashMap::new();
@@ -25,8 +25,8 @@ pub fn compute_first_set(productions: &Vec<Production>) -> HashMap<Symbol, HashS
     first_map
 }
 
-fn first_recursive(productions: &Vec<Production>, non_terminal: &String) -> HashSet<String> {
-    let filter_by_non_terminal: Vec<&Production> = productions
+fn first_recursive<T>(productions: &Vec<Production<T>>, non_terminal: &String) -> HashSet<String> {
+    let filter_by_non_terminal: Vec<&Production<T>> = productions
         .iter()
         .filter(|p| p.head.eq(non_terminal))
         .collect();

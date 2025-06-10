@@ -19,23 +19,26 @@ use crate::terminal;
 use crate::terminal::Terminal;
 
 #[derive(Debug)]
-pub struct Parser {
-    pub productions: Vec<Production>,
-    pub lr0_automaton: Vec<State>,
+pub struct Parser<T> {
+    pub productions: Vec<Production<T>>,
+    pub lr0_automaton: Vec<State<T>>,
     pub symbols: Vec<Symbol>, //every gramar symbol that exists in grammar
     pub follow_set: HashMap<Symbol, HashSet<String>>,
     pub first_set: HashMap<Symbol, HashSet<String>>,
     pub conflicts: bool,
 }
 
-impl Parser {
-    pub fn new(productions: Vec<Production>) -> Parser {
+impl<T> Parser<T>
+where
+    T: Clone,
+{
+    pub fn new(productions: Vec<Production<T>>) -> Parser<T> {
         let mut productions_ = productions.clone();
         let dummy = vec![1, 2];
 
         //creating augmented production
         let start_symbol = productions_.first().unwrap();
-        let augmented_production: Production = Production {
+        let augmented_production: Production<T> = Production {
             head: String::from("S'"),
             body: vec![Symbol::NONTERMINAL(start_symbol.head.clone())],
             cursor_pos: 0,
@@ -62,7 +65,7 @@ impl Parser {
         }
     }
 
-    pub fn closure(&self, productions: &mut Vec<Production>) {
+    pub fn closure(&self, productions: &mut Vec<Production<T>>) {
         let mut symbols: Vec<String> = vec![];
         loop {
             let productions_ = productions.clone();
@@ -83,7 +86,7 @@ impl Parser {
                     symbols.push(symbol.clone());
                 }
 
-                let matched_head_productions: Vec<Production> = self
+                let matched_head_productions: Vec<Production<T>> = self
                     .productions
                     .iter()
                     .cloned()
@@ -101,8 +104,8 @@ impl Parser {
 
     //GOTO(Item,Symbol) is defined to be the closure of the set of
     //all items [A -> aX.B] such that [A -> a.XB] is in I {ref:ullman dragon book}
-    pub fn goto(&self, productions: &Vec<Production>, symbol: &Symbol) -> State {
-        let mut goto_productions: Vec<Production> = productions
+    pub fn goto(&self, productions: &Vec<Production<T>>, symbol: &Symbol) -> State<T> {
+        let mut goto_productions: Vec<Production<T>> = productions
             .iter()
             .filter(|production| match production.next_symbol() {
                 Some(symbol_) => symbol.eq(symbol_),
@@ -140,7 +143,7 @@ impl Parser {
             goto: HashMap::new(),
             conflicts: HashMap::new(),
         };
-        let mut canonical_collection: Vec<State> = vec![initial_state];
+        let mut canonical_collection: Vec<State<T>> = vec![initial_state];
         loop {
             //this clone is for because we cant update the vector which is already in use
             let mut canonical_clone = canonical_collection.clone();
@@ -305,17 +308,19 @@ impl Parser {
         self.lr0_automaton = canonical_collection;
     }
 
-    pub fn parse<T: Terminal + Debug + Clone>(
+    pub fn parse<TokenType: Terminal + Debug + Clone>(
         &self,
-        input: Vec<T>,
-        errors: &mut Vec<ParseError<T>>,
+        input: Vec<TokenType>,
+        errors: &mut Vec<ParseError<TokenType>>,
     ) {
-        let mut stack: Vec<State> = Vec::new();
+        let mut stack: Vec<State<T>> = Vec::new();
         let mut input_iter = input.iter();
         let mut current_input = input_iter.next().unwrap();
         let mut previous_input = current_input;
         let mut current_input_string = current_input.to_string_c();
         let mut top_state = self.lr0_automaton.first().unwrap();
+
+        let mut translator_stack: Vec<T> = Vec::new();
 
         stack.push(top_state.clone());
         loop {
@@ -332,7 +337,7 @@ impl Parser {
                     Action::REDUCE(production) => {
                         let production_ = self.productions.get(production.clone()).unwrap();
                         match &production_.action {
-                            Some(actionaa) => (actionaa.as_ref())(vec![1, 2]),
+                            Some(actionaa) => (actionaa.as_ref())(&translator_stack),
                             None => {}
                         };
                         let pop_len = production_.body.len();
@@ -357,7 +362,7 @@ impl Parser {
                 let mut error_message = counstruct_syntax_error_message(top_state);
 
                 let deduced_productions = top_state.transition_productions.clone();
-                let mut deduced_production: Option<Production> = None;
+                let mut deduced_production: Option<Production<T>> = None;
                 loop {
                     stack.pop();
                     top_state = stack.last().unwrap();
@@ -414,7 +419,7 @@ impl Parser {
     }
 }
 
-fn counstruct_syntax_error_message(state: &State) -> String {
+fn counstruct_syntax_error_message<T>(state: &State<T>) -> String {
     let action_keys: Vec<String> = state.action.keys().cloned().collect();
     String::from("Expected ") + join_either_or(action_keys).as_str()
 }
@@ -432,10 +437,10 @@ fn join_either_or(items: Vec<String>) -> String {
     }
 }
 
-fn is_items_in_canonical_collection(
-    states: Vec<State>,
-    item: &Vec<Production>,
-) -> (bool, Option<State>) {
+fn is_items_in_canonical_collection<T: Clone>(
+    states: Vec<State<T>>,
+    item: &Vec<Production<T>>,
+) -> (bool, Option<State<T>>) {
     let mut contains = false;
     for state in states.iter() {
         if state.productions.len() != item.len() {
@@ -456,19 +461,19 @@ fn is_items_in_canonical_collection(
     (contains, None)
 }
 
-fn compute_shift_reduce_productions(
-    productions: &Vec<Production>,
-) -> (Vec<Production>, Vec<Production>) {
+fn compute_shift_reduce_productions<T: Clone>(
+    productions: &Vec<Production<T>>,
+) -> (Vec<Production<T>>, Vec<Production<T>>) {
     let filter_by_dot_at_the_rightend =
-        |production: &Production| production.cursor_pos == production.body.len();
+        |production: &Production<T>| production.cursor_pos == production.body.len();
 
-    let reduce_productions: Vec<Production> = productions
+    let reduce_productions: Vec<Production<T>> = productions
         .iter()
         .cloned()
         .filter(filter_by_dot_at_the_rightend)
         .collect();
 
-    let shift_productions: Vec<Production> = productions
+    let shift_productions: Vec<Production<T>> = productions
         .iter()
         .cloned()
         .filter(|p| !filter_by_dot_at_the_rightend(p))

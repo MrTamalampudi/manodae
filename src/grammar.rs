@@ -6,12 +6,12 @@ use std::sync::Arc;
 use crate::production::Production;
 
 #[derive(Debug)]
-pub struct Grammar {
-    pub productions: Vec<Production>,
+pub struct Grammar<T> {
+    pub productions: Vec<Production<T>>,
 }
 
-impl Grammar {
-    pub fn new() -> Grammar {
+impl<T> Grammar<T> {
+    pub fn new() -> Grammar<T> {
         Grammar {
             productions: Vec::new(),
         }
@@ -22,6 +22,7 @@ impl Grammar {
 macro_rules! grammar {
     (
         $terminal_type:ident,
+        $translator_stack_type:ident,
         $(
             $head:ident -> $(
                 $([$($terminal:expr),*])?
@@ -31,14 +32,14 @@ macro_rules! grammar {
             )|+
         );+
     ) => {{
-        let mut grammar: Grammar= Grammar::new();
+        let mut grammar: Grammar<$translator_stack_type> = Grammar::new();
         $({
             $({let mut body_ : Vec<Symbol> = Vec::new();
             $($(body_.push(Symbol::TERMINAL($terminal.to_string_c()));)*)?
             $(
                 body_.push(Symbol::NONTERMINAL(stringify!($non_terminal).to_string()));
             )*
-            let mut production:Production = Production {
+            let mut production:Production<$translator_stack_type> = Production {
                 head: stringify!($head).to_string(),
                 body: body_,
                 cursor_pos: 0,

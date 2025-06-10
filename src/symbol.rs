@@ -9,7 +9,7 @@ pub enum Symbol {
     NONE,
 }
 
-pub fn unique_symbols(productions: &Vec<Production>) -> Vec<Symbol> {
+pub fn unique_symbols<T>(productions: &Vec<Production<T>>) -> Vec<Symbol> {
     let mut symbols: Vec<Symbol> = Vec::new();
 
     for production in productions.iter() {
