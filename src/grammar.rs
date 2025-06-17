@@ -6,12 +6,12 @@ use std::sync::Arc;
 use crate::production::Production;
 
 #[derive(Debug)]
-pub struct Grammar<T> {
-    pub productions: Vec<Production<T>>,
+pub struct Grammar<T, TokenType> {
+    pub productions: Vec<Production<T, TokenType>>,
 }
 
-impl<T> Grammar<T> {
-    pub fn new() -> Grammar<T> {
+impl<T, TokenType> Grammar<T, TokenType> {
+    pub fn new() -> Grammar<T, TokenType> {
         Grammar {
             productions: Vec::new(),
         }
@@ -23,23 +23,25 @@ macro_rules! grammar {
     (
         $terminal_type:ident,
         $translator_stack_type:ident,
+        $token_stack_type:ident,
         $(
             $head:ident -> $(
                 $([$($terminal:expr),*])?
                 $($non_terminal:ident)*
                 $({error:$error:literal})?
-                $({action:|$arg1:ident| $expr:block})?
+                $({action:|$arg1:ident,$arg2:ident,$arg3:ident| $expr:block})?
             )|+
         );+
     ) => {{
-        let mut grammar: Grammar<$translator_stack_type> = Grammar::new();
+        //$terminal_type == TokenType
+        let mut grammar: Grammar<$translator_stack_type,$token_stack_type> = Grammar::new();
         $({
             $({let mut body_ : Vec<Symbol> = Vec::new();
             $($(body_.push(Symbol::TERMINAL($terminal.to_string_c()));)*)?
             $(
                 body_.push(Symbol::NONTERMINAL(stringify!($non_terminal).to_string()));
             )*
-            let mut production:Production<$translator_stack_type> = Production {
+            let mut production:Production<$translator_stack_type,$token_stack_type> = Production {
                 head: stringify!($head).to_string(),
                 body: body_,
                 cursor_pos: 0,
@@ -53,7 +55,7 @@ macro_rules! grammar {
               }
             )?
             $(
-                {production.action = Some(Arc::new(|$arg1| $expr))}
+                {production.action = Some(Arc::new(|$arg1,$arg2,$arg3| $expr))}
             )?
             grammar.productions.push(production);})+
         })+

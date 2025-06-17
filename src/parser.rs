@@ -19,32 +19,32 @@ use crate::terminal;
 use crate::terminal::Terminal;
 
 #[derive(Debug)]
-pub struct Parser<T> {
-    pub productions: Vec<Production<T>>,
-    pub lr0_automaton: Vec<State<T>>,
+pub struct Parser<T, TokenType> {
+    pub productions: Vec<Production<T, TokenType>>,
+    pub lr0_automaton: Vec<State<T, TokenType>>,
     pub symbols: Vec<Symbol>, //every gramar symbol that exists in grammar
     pub follow_set: HashMap<Symbol, HashSet<String>>,
     pub first_set: HashMap<Symbol, HashSet<String>>,
     pub conflicts: bool,
 }
 
-impl<T> Parser<T>
+impl<T, TokenType> Parser<T, TokenType>
 where
     T: Clone,
+    TokenType: Terminal + Debug + Clone,
 {
-    pub fn new(productions: Vec<Production<T>>) -> Parser<T> {
+    pub fn new(productions: Vec<Production<T, TokenType>>) -> Parser<T, TokenType> {
         let mut productions_ = productions.clone();
-        let dummy = vec![1, 2];
 
         //creating augmented production
         let start_symbol = productions_.first().unwrap();
-        let augmented_production: Production<T> = Production {
+        let augmented_production: Production<T, TokenType> = Production {
             head: String::from("S'"),
             body: vec![Symbol::NONTERMINAL(start_symbol.head.clone())],
             cursor_pos: 0,
             index: 0,
             error_message: None,
-            action: Some(Arc::new(|dummy| println!("msdian"))),
+            action: Some(Arc::new(|tl_stack, input_stack, token_stack| {})),
         };
 
         productions_.insert(0, augmented_production);
@@ -65,7 +65,7 @@ where
         }
     }
 
-    pub fn closure(&self, productions: &mut Vec<Production<T>>) {
+    pub fn closure(&self, productions: &mut Vec<Production<T, TokenType>>) {
         let mut symbols: Vec<String> = vec![];
         loop {
             let productions_ = productions.clone();
@@ -86,7 +86,7 @@ where
                     symbols.push(symbol.clone());
                 }
 
-                let matched_head_productions: Vec<Production<T>> = self
+                let matched_head_productions: Vec<Production<T, TokenType>> = self
                     .productions
                     .iter()
                     .cloned()
@@ -104,8 +104,12 @@ where
 
     //GOTO(Item,Symbol) is defined to be the closure of the set of
     //all items [A -> aX.B] such that [A -> a.XB] is in I {ref:ullman dragon book}
-    pub fn goto(&self, productions: &Vec<Production<T>>, symbol: &Symbol) -> State<T> {
-        let mut goto_productions: Vec<Production<T>> = productions
+    pub fn goto(
+        &self,
+        productions: &Vec<Production<T, TokenType>>,
+        symbol: &Symbol,
+    ) -> State<T, TokenType> {
+        let mut goto_productions: Vec<Production<T, TokenType>> = productions
             .iter()
             .filter(|production| match production.next_symbol() {
                 Some(symbol_) => symbol.eq(symbol_),
@@ -143,7 +147,7 @@ where
             goto: HashMap::new(),
             conflicts: HashMap::new(),
         };
-        let mut canonical_collection: Vec<State<T>> = vec![initial_state];
+        let mut canonical_collection: Vec<State<T, TokenType>> = vec![initial_state];
         loop {
             //this clone is for because we cant update the vector which is already in use
             let mut canonical_clone = canonical_collection.clone();
@@ -308,12 +312,8 @@ where
         self.lr0_automaton = canonical_collection;
     }
 
-    pub fn parse<TokenType: Terminal + Debug + Clone>(
-        &self,
-        input: Vec<TokenType>,
-        errors: &mut Vec<ParseError<TokenType>>,
-    ) {
-        let mut stack: Vec<State<T>> = Vec::new();
+    pub fn parse(&self, input: Vec<TokenType>, errors: &mut Vec<ParseError<TokenType>>) {
+        let mut stack: Vec<State<T, TokenType>> = Vec::new();
         let mut input_iter = input.iter();
         let mut current_input = input_iter.next().unwrap();
         let mut previous_input = current_input;
@@ -321,6 +321,12 @@ where
         let mut top_state = self.lr0_automaton.first().unwrap();
 
         let mut translator_stack: Vec<T> = Vec::new();
+
+        //TO store some useful symbols from input like Token::String(string)
+        // that string will be added to this stack
+        let mut input_symbol_stack: Vec<String> = Vec::new();
+
+        let mut input_token_stack: Vec<&TokenType> = Vec::new();
 
         stack.push(top_state.clone());
         loop {
@@ -330,6 +336,14 @@ where
                 match top_state.action.get(&current_input_string).unwrap() {
                     Action::SHIFT(state) => {
                         stack.push(self.lr0_automaton.get(state.clone()).unwrap().clone());
+                        match current_input.get_value() {
+                            Some(string) => input_symbol_stack.push(string),
+                            None => {}
+                        };
+
+                        //To maintain current input as a stack helps library user;
+                        input_token_stack.push(current_input);
+
                         previous_input = current_input;
                         current_input = input_iter.next().unwrap();
                         current_input_string = current_input.to_string_c();
@@ -337,7 +351,11 @@ where
                     Action::REDUCE(production) => {
                         let production_ = self.productions.get(production.clone()).unwrap();
                         match &production_.action {
-                            Some(actionaa) => (actionaa.as_ref())(&translator_stack),
+                            Some(actionaa) => (actionaa.as_ref())(
+                                &mut translator_stack,
+                                &mut input_symbol_stack,
+                                &mut input_token_stack,
+                            ),
                             None => {}
                         };
                         let pop_len = production_.body.len();
@@ -362,7 +380,7 @@ where
                 let mut error_message = counstruct_syntax_error_message(top_state);
 
                 let deduced_productions = top_state.transition_productions.clone();
-                let mut deduced_production: Option<Production<T>> = None;
+                let mut deduced_production: Option<Production<T, TokenType>> = None;
                 loop {
                     stack.pop();
                     top_state = stack.last().unwrap();
@@ -419,7 +437,7 @@ where
     }
 }
 
-fn counstruct_syntax_error_message<T>(state: &State<T>) -> String {
+fn counstruct_syntax_error_message<T, TokenType>(state: &State<T, TokenType>) -> String {
     let action_keys: Vec<String> = state.action.keys().cloned().collect();
     String::from("Expected ") + join_either_or(action_keys).as_str()
 }
@@ -437,10 +455,10 @@ fn join_either_or(items: Vec<String>) -> String {
     }
 }
 
-fn is_items_in_canonical_collection<T: Clone>(
-    states: Vec<State<T>>,
-    item: &Vec<Production<T>>,
-) -> (bool, Option<State<T>>) {
+fn is_items_in_canonical_collection<T: Clone, TokenType: Clone>(
+    states: Vec<State<T, TokenType>>,
+    item: &Vec<Production<T, TokenType>>,
+) -> (bool, Option<State<T, TokenType>>) {
     let mut contains = false;
     for state in states.iter() {
         if state.productions.len() != item.len() {
@@ -461,19 +479,19 @@ fn is_items_in_canonical_collection<T: Clone>(
     (contains, None)
 }
 
-fn compute_shift_reduce_productions<T: Clone>(
-    productions: &Vec<Production<T>>,
-) -> (Vec<Production<T>>, Vec<Production<T>>) {
+fn compute_shift_reduce_productions<T: Clone, TokenType: Clone>(
+    productions: &Vec<Production<T, TokenType>>,
+) -> (Vec<Production<T, TokenType>>, Vec<Production<T, TokenType>>) {
     let filter_by_dot_at_the_rightend =
-        |production: &Production<T>| production.cursor_pos == production.body.len();
+        |production: &Production<T, TokenType>| production.cursor_pos == production.body.len();
 
-    let reduce_productions: Vec<Production<T>> = productions
+    let reduce_productions: Vec<Production<T, TokenType>> = productions
         .iter()
         .cloned()
         .filter(filter_by_dot_at_the_rightend)
         .collect();
 
-    let shift_productions: Vec<Production<T>> = productions
+    let shift_productions: Vec<Production<T, TokenType>> = productions
         .iter()
         .cloned()
         .filter(|p| !filter_by_dot_at_the_rightend(p))

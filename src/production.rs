@@ -3,16 +3,16 @@ use std::{fmt::Debug, sync::Arc};
 use crate::symbol::Symbol;
 
 #[derive(Clone)]
-pub struct Production<T> {
+pub struct Production<T, TokenType> {
     pub head: String,
     pub body: Vec<Symbol>,
     pub cursor_pos: usize,
     pub index: usize,
     pub error_message: Option<String>,
-    pub action: Option<Arc<dyn Fn(&Vec<T>)>>,
+    pub action: Option<Arc<dyn Fn(&mut Vec<T>, &mut Vec<String>, &mut Vec<&TokenType>)>>,
 }
 
-impl<T> std::fmt::Debug for Production<T> {
+impl<T, TokenType> std::fmt::Debug for Production<T, TokenType> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Production")
             .field("head", &self.head)
@@ -24,7 +24,7 @@ impl<T> std::fmt::Debug for Production<T> {
     }
 }
 
-impl<T> PartialEq for Production<T> {
+impl<T, TokenType> PartialEq for Production<T, TokenType> {
     fn eq(&self, other: &Self) -> bool {
         self.head == other.head
             && self.body == other.body
@@ -34,7 +34,7 @@ impl<T> PartialEq for Production<T> {
     }
 }
 
-impl<T> Production<T> {
+impl<T, TokenType> Production<T, TokenType> {
     pub fn next_symbol(&self) -> Option<&Symbol> {
         if self.cursor_pos == self.body.len() {
             None
