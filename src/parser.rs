@@ -30,7 +30,7 @@ pub struct Parser<T, TokenType> {
 
 impl<T, TokenType> Parser<T, TokenType>
 where
-    T: Clone,
+    T: Clone + Debug,
     TokenType: Terminal + Debug + Clone,
 {
     pub fn new(productions: Vec<Production<T, TokenType>>) -> Parser<T, TokenType> {
@@ -44,7 +44,7 @@ where
             cursor_pos: 0,
             index: 0,
             error_message: None,
-            action: Some(Arc::new(|tl_stack, input_stack, token_stack| {})),
+            action: Some(Arc::new(|tl_stack, token_stack, errors| {})),
         };
 
         productions_.insert(0, augmented_production);
@@ -319,13 +319,7 @@ where
         let mut previous_input = current_input;
         let mut current_input_string = current_input.to_string_c();
         let mut top_state = self.lr0_automaton.first().unwrap();
-
         let mut translator_stack: Vec<T> = Vec::new();
-
-        //TO store some useful symbols from input like Token::String(string)
-        // that string will be added to this stack
-        let mut input_symbol_stack: Vec<String> = Vec::new();
-
         let mut input_token_stack: Vec<&TokenType> = Vec::new();
 
         stack.push(top_state.clone());
@@ -336,10 +330,6 @@ where
                 match top_state.action.get(&current_input_string).unwrap() {
                     Action::SHIFT(state) => {
                         stack.push(self.lr0_automaton.get(state.clone()).unwrap().clone());
-                        match current_input.get_value() {
-                            Some(string) => input_symbol_stack.push(string),
-                            None => {}
-                        };
 
                         //To maintain current input as a stack helps library user;
                         input_token_stack.push(current_input);
@@ -353,8 +343,8 @@ where
                         match &production_.action {
                             Some(actionaa) => (actionaa.as_ref())(
                                 &mut translator_stack,
-                                &mut input_symbol_stack,
                                 &mut input_token_stack,
+                                errors,
                             ),
                             None => {}
                         };
@@ -434,6 +424,8 @@ where
                 }
             }
         }
+
+        println!("tl_stack{:#?}", translator_stack);
     }
 }
 

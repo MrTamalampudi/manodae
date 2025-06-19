@@ -33,7 +33,6 @@ macro_rules! grammar {
             )|+
         );+
     ) => {{
-        //$terminal_type == TokenType
         let mut grammar: Grammar<$translator_stack_type,$token_stack_type> = Grammar::new();
         $({
             $({let mut body_ : Vec<Symbol> = Vec::new();
