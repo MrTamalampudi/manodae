@@ -10,7 +10,7 @@ pub struct Production<T, TokenType> {
     pub index: usize,
     pub error_message: Option<String>,
     pub action:
-        Option<Arc<dyn Fn(&mut Vec<T>, &mut Vec<&TokenType>, &mut Vec<ParseError<TokenType>>)>>,
+        Option<Arc<dyn Fn(&mut Vec<T>, &mut Vec<TokenType>, &mut Vec<ParseError<TokenType>>)>>,
 }
 
 impl<T, TokenType> std::fmt::Debug for Production<T, TokenType> {

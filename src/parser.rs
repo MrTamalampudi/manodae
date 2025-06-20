@@ -320,7 +320,7 @@ where
         let mut current_input_string = current_input.to_string_c();
         let mut top_state = self.lr0_automaton.first().unwrap();
         let mut translator_stack: Vec<T> = Vec::new();
-        let mut input_token_stack: Vec<&TokenType> = Vec::new();
+        let mut input_token_stack: Vec<TokenType> = Vec::new();
 
         stack.push(top_state.clone());
         loop {
@@ -332,7 +332,7 @@ where
                         stack.push(self.lr0_automaton.get(state.clone()).unwrap().clone());
 
                         //To maintain current input as a stack helps library user;
-                        input_token_stack.push(current_input);
+                        input_token_stack.push(current_input.clone());
 
                         previous_input = current_input;
                         current_input = input_iter.next().unwrap();
