@@ -2,8 +2,6 @@ use core::panic;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Debug;
-use std::hash::Hash;
-use std::str::Matches;
 use std::sync::Arc;
 
 use crate::action::Action;
@@ -15,7 +13,6 @@ use crate::production::Production;
 use crate::state::State;
 use crate::symbol::unique_symbols;
 use crate::symbol::Symbol;
-use crate::terminal;
 use crate::terminal::Terminal;
 
 #[derive(Debug)]
@@ -44,7 +41,9 @@ where
             cursor_pos: 0,
             index: 0,
             error_message: None,
-            action: Some(Arc::new(|tl_stack, token_stack, errors| {})),
+
+            #[allow(unused_variables)]
+            action: Some(Arc::new(|ast, token_stack, errors| {})),
         };
 
         productions_.insert(0, augmented_production);
@@ -150,7 +149,7 @@ where
         let mut canonical_collection: Vec<State<T, TokenType>> = vec![initial_state];
         loop {
             //this clone is for because we cant update the vector which is already in use
-            let mut canonical_clone = canonical_collection.clone();
+            let canonical_clone = canonical_collection.clone();
             //this loop is uneccesary it can be optimised
             for state_clone in canonical_clone.iter() {
                 let (reduce_productions, shift_productions) =
@@ -312,14 +311,19 @@ where
         self.lr0_automaton = canonical_collection;
     }
 
-    pub fn parse(&self, input: Vec<TokenType>, errors: &mut Vec<ParseError<TokenType>>) {
+    pub fn parse(
+        &self,
+        tokens_input: Vec<TokenType>,
+        errors: &mut Vec<ParseError<TokenType>>,
+        ast: &mut T,
+    ) {
         let mut stack: Vec<State<T, TokenType>> = Vec::new();
-        let mut input_iter = input.iter();
+        let mut input_iter = tokens_input.iter();
         let mut current_input = input_iter.next().unwrap();
         let mut previous_input = current_input;
         let mut current_input_string = current_input.to_string_c();
         let mut top_state = self.lr0_automaton.first().unwrap();
-        let mut translator_stack: Vec<T> = Vec::new();
+        // let mut translator_stack: Option<T> = None;
         let mut input_token_stack: Vec<TokenType> = Vec::new();
 
         stack.push(top_state.clone());
@@ -341,11 +345,7 @@ where
                     Action::REDUCE(production) => {
                         let production_ = self.productions.get(production.clone()).unwrap();
                         match &production_.action {
-                            Some(actionaa) => (actionaa.as_ref())(
-                                &mut translator_stack,
-                                &mut input_token_stack,
-                                errors,
-                            ),
+                            Some(action) => (action.as_ref())(ast, &mut input_token_stack, errors),
                             None => {}
                         };
                         let pop_len = production_.body.len();
@@ -425,7 +425,7 @@ where
             }
         }
 
-        println!("tl_stack{:#?}", translator_stack);
+        println!("tl_stack{:#?}", ast);
     }
 }
 

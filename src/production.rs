@@ -2,6 +2,7 @@ use std::{fmt::Debug, sync::Arc};
 
 use crate::{error::ParseError, symbol::Symbol};
 
+//T means AST
 #[derive(Clone)]
 pub struct Production<T, TokenType> {
     pub head: String,
@@ -9,8 +10,7 @@ pub struct Production<T, TokenType> {
     pub cursor_pos: usize,
     pub index: usize,
     pub error_message: Option<String>,
-    pub action:
-        Option<Arc<dyn Fn(&mut Vec<T>, &mut Vec<TokenType>, &mut Vec<ParseError<TokenType>>)>>,
+    pub action: Option<Arc<dyn Fn(&mut T, &mut Vec<TokenType>, &mut Vec<ParseError<TokenType>>)>>,
 }
 
 impl<T, TokenType> std::fmt::Debug for Production<T, TokenType> {

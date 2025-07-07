@@ -22,7 +22,7 @@ impl<T, TokenType> Grammar<T, TokenType> {
 macro_rules! grammar {
     (
         $terminal_type:ident,
-        $translator_stack_type:ident,
+        $ast_type:ident,
         $token_stack_type:ident,
         $(
             $head:ident -> $(
@@ -33,14 +33,14 @@ macro_rules! grammar {
             )|+
         );+
     ) => {{
-        let mut grammar: Grammar<$translator_stack_type,$token_stack_type> = Grammar::new();
+        let mut grammar: Grammar<$ast_type,$token_stack_type> = Grammar::new();
         $({
             $({let mut body_ : Vec<Symbol> = Vec::new();
             $($(body_.push(Symbol::TERMINAL($terminal.to_string_c()));)*)?
             $(
                 body_.push(Symbol::NONTERMINAL(stringify!($non_terminal).to_string()));
             )*
-            let mut production:Production<$translator_stack_type,$token_stack_type> = Production {
+            let mut production:Production<$ast_type,$token_stack_type> = Production {
                 head: stringify!($head).to_string(),
                 body: body_,
                 cursor_pos: 0,
