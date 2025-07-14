@@ -315,7 +315,7 @@ where
         &self,
         tokens_input: Vec<TokenType>,
         errors: &mut Vec<ParseError<TokenType>>,
-        ast: &mut T,
+        ast: &mut Vec<T>,
     ) {
         let mut stack: Vec<State<T, TokenType>> = Vec::new();
         let mut input_iter = tokens_input.iter();
