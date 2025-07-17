@@ -1,7 +1,6 @@
 //cfg grammar should be in bnf format
 
 use std::fmt::Debug;
-use std::sync::Arc;
 
 use crate::production::Production;
 

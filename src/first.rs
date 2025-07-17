@@ -1,9 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    production::{self, Production},
+    production::Production,
     symbol::{unique_symbols, Symbol},
-    terminal,
 };
 
 pub fn compute_first_set<T, TokenType>(

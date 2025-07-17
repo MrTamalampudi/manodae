@@ -315,7 +315,7 @@ where
         &self,
         tokens_input: Vec<TokenType>,
         errors: &mut Vec<ParseError<TokenType>>,
-        ast: &mut Vec<T>,
+        translator_stack: &mut Vec<T>,
     ) {
         let mut stack: Vec<State<T, TokenType>> = Vec::new();
         let mut input_iter = tokens_input.iter();
@@ -345,7 +345,9 @@ where
                     Action::REDUCE(production) => {
                         let production_ = self.productions.get(production.clone()).unwrap();
                         match &production_.action {
-                            Some(action) => (action.as_ref())(ast, &mut input_token_stack, errors),
+                            Some(action) => {
+                                (action.as_ref())(translator_stack, &mut input_token_stack, errors)
+                            }
                             None => {}
                         };
                         let pop_len = production_.body.len();
@@ -405,13 +407,13 @@ where
                             errors.push(ParseError {
                                 token: previous_input.clone(),
                                 message: error_message,
-                                productionEnd: true,
+                                production_end: true,
                             });
                         } else {
                             errors.push(ParseError {
                                 token: error_token.clone(),
                                 message: error_message,
-                                productionEnd: false,
+                                production_end: false,
                             });
                         }
                         break;
@@ -425,7 +427,7 @@ where
             }
         }
 
-        println!("tl_stack{:#?}", ast);
+        println!("tl_stack{:#?}", translator_stack);
     }
 }
 
