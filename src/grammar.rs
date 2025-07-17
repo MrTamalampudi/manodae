@@ -30,7 +30,7 @@ macro_rules! grammar {
                 $({error:$error:literal})?
                 $({action:|$arg1:ident,$arg2:ident,$arg3:ident| $expr:block})?
             )|+
-        );+
+        );+;
     ) => {{
         let mut grammar: Grammar<$translator_stack_type,$token_stack_type> = Grammar::new();
         $({
