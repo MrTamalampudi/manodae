@@ -5,8 +5,8 @@ use crate::{
     symbol::{unique_symbols, Symbol},
 };
 
-pub fn compute_first_set<AST, Token>(
-    productions: &Vec<Production<AST, Token>>,
+pub fn compute_first_set<AST, Token, TranslatorStack>(
+    productions: &Vec<Production<AST, Token, TranslatorStack>>,
 ) -> HashMap<Symbol, HashSet<String>> {
     let symbols = unique_symbols(productions);
 
@@ -26,11 +26,11 @@ pub fn compute_first_set<AST, Token>(
     first_map
 }
 
-fn first_recursive<AST, Token>(
-    productions: &Vec<Production<AST, Token>>,
+fn first_recursive<AST, Token, TranslatorStack>(
+    productions: &Vec<Production<AST, Token, TranslatorStack>>,
     non_terminal: &String,
 ) -> HashSet<String> {
-    let filter_by_non_terminal: Vec<&Production<AST, Token>> = productions
+    let filter_by_non_terminal: Vec<&Production<AST, Token, TranslatorStack>> = productions
         .iter()
         .filter(|p| p.head.eq(non_terminal))
         .collect();

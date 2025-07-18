@@ -16,26 +16,29 @@ use crate::symbol::Symbol;
 use crate::terminal::Terminal;
 
 #[derive(Debug)]
-pub struct Parser<AST, Token> {
-    pub productions: Vec<Production<AST, Token>>,
-    pub lr0_automaton: Vec<State<AST, Token>>,
+pub struct Parser<AST, Token, TranslatorStack> {
+    pub productions: Vec<Production<AST, Token, TranslatorStack>>,
+    pub lr0_automaton: Vec<State<AST, Token, TranslatorStack>>,
     pub symbols: Vec<Symbol>, //every gramar symbol that exists in grammar
     pub follow_set: HashMap<Symbol, HashSet<String>>,
     pub first_set: HashMap<Symbol, HashSet<String>>,
     pub conflicts: bool,
 }
 
-impl<AST, Token> Parser<AST, Token>
+impl<AST, Token, TranslatorStack> Parser<AST, Token, TranslatorStack>
 where
     AST: Clone + Debug,
     Token: Terminal + Debug + Clone,
+    TranslatorStack: Clone,
 {
-    pub fn new(productions: Vec<Production<AST, Token>>) -> Parser<AST, Token> {
+    pub fn new(
+        productions: Vec<Production<AST, Token, TranslatorStack>>,
+    ) -> Parser<AST, Token, TranslatorStack> {
         let mut productions_ = productions.clone();
 
         //creating augmented production
         let start_symbol = productions_.first().unwrap();
-        let augmented_production: Production<AST, Token> = Production {
+        let augmented_production: Production<AST, Token, TranslatorStack> = Production {
             head: String::from("S'"),
             body: vec![Symbol::NONTERMINAL(start_symbol.head.clone())],
             cursor_pos: 0,
@@ -43,7 +46,7 @@ where
             error_message: None,
 
             #[allow(unused_variables)]
-            action: Some(Arc::new(|ast, token_stack, errors| {})),
+            action: Some(Arc::new(|ast, token_stack, tl_stack, errors| {})),
         };
 
         productions_.insert(0, augmented_production);
@@ -64,7 +67,7 @@ where
         }
     }
 
-    pub fn closure(&self, productions: &mut Vec<Production<AST, Token>>) {
+    pub fn closure(&self, productions: &mut Vec<Production<AST, Token, TranslatorStack>>) {
         let mut symbols: Vec<String> = vec![];
         loop {
             let productions_ = productions.clone();
@@ -85,7 +88,7 @@ where
                     symbols.push(symbol.clone());
                 }
 
-                let matched_head_productions: Vec<Production<AST, Token>> = self
+                let matched_head_productions: Vec<Production<AST, Token, TranslatorStack>> = self
                     .productions
                     .iter()
                     .cloned()
@@ -105,10 +108,10 @@ where
     //all items [A -> aX.B] such that [A -> a.XB] is in I {ref:ullman dragon book}
     pub fn goto(
         &self,
-        productions: &Vec<Production<AST, Token>>,
+        productions: &Vec<Production<AST, Token, TranslatorStack>>,
         symbol: &Symbol,
-    ) -> State<AST, Token> {
-        let mut goto_productions: Vec<Production<AST, Token>> = productions
+    ) -> State<AST, Token, TranslatorStack> {
+        let mut goto_productions: Vec<Production<AST, Token, TranslatorStack>> = productions
             .iter()
             .filter(|production| match production.next_symbol() {
                 Some(symbol_) => symbol.eq(symbol_),
@@ -146,7 +149,7 @@ where
             goto: HashMap::new(),
             conflicts: HashMap::new(),
         };
-        let mut canonical_collection: Vec<State<AST, Token>> = vec![initial_state];
+        let mut canonical_collection: Vec<State<AST, Token, TranslatorStack>> = vec![initial_state];
         loop {
             //this clone is for because we cant update the vector which is already in use
             let canonical_clone = canonical_collection.clone();
@@ -315,15 +318,15 @@ where
         &self,
         tokens_input: Vec<Token>,
         errors: &mut Vec<ParseError<Token>>,
-        translator_stack: &mut Vec<AST>,
+        ast: &mut AST,
     ) {
-        let mut stack: Vec<State<AST, Token>> = Vec::new();
+        let mut stack: Vec<State<AST, Token, TranslatorStack>> = Vec::new();
         let mut input_iter = tokens_input.iter();
         let mut current_input = input_iter.next().unwrap();
         let mut previous_input = current_input;
         let mut current_input_string = current_input.to_string_c();
         let mut top_state = self.lr0_automaton.first().unwrap();
-        // let mut translator_stack: Option<AST> = None;
+        let mut translator_stack: Vec<TranslatorStack> = Vec::new();
         let mut input_token_stack: Vec<Token> = Vec::new();
 
         stack.push(top_state.clone());
@@ -345,9 +348,12 @@ where
                     Action::REDUCE(production) => {
                         let production_ = self.productions.get(production.clone()).unwrap();
                         match &production_.action {
-                            Some(action) => {
-                                (action.as_ref())(translator_stack, &mut input_token_stack, errors)
-                            }
+                            Some(action) => (action.as_ref())(
+                                ast,
+                                &mut input_token_stack,
+                                &mut translator_stack,
+                                errors,
+                            ),
                             None => {}
                         };
                         let pop_len = production_.body.len();
@@ -372,7 +378,7 @@ where
                 let mut error_message = counstruct_syntax_error_message(top_state);
 
                 let deduced_productions = top_state.transition_productions.clone();
-                let mut deduced_production: Option<Production<AST, Token>> = None;
+                let mut deduced_production: Option<Production<AST, Token, TranslatorStack>> = None;
                 loop {
                     stack.pop();
                     top_state = stack.last().unwrap();
@@ -427,11 +433,13 @@ where
             }
         }
 
-        println!("tl_stack{:#?}", translator_stack);
+        println!("tl_stack{:#?}", ast);
     }
 }
 
-fn counstruct_syntax_error_message<AST, Token>(state: &State<AST, Token>) -> String {
+fn counstruct_syntax_error_message<AST, Token, TranslatorStack>(
+    state: &State<AST, Token, TranslatorStack>,
+) -> String {
     let action_keys: Vec<String> = state.action.keys().cloned().collect();
     String::from("Expected ") + join_either_or(action_keys).as_str()
 }
@@ -449,10 +457,10 @@ fn join_either_or(items: Vec<String>) -> String {
     }
 }
 
-fn is_items_in_canonical_collection<AST: Clone, Token: Clone>(
-    states: Vec<State<AST, Token>>,
-    item: &Vec<Production<AST, Token>>,
-) -> (bool, Option<State<AST, Token>>) {
+fn is_items_in_canonical_collection<AST: Clone, Token: Clone, TranslatorStack: Clone>(
+    states: Vec<State<AST, Token, TranslatorStack>>,
+    item: &Vec<Production<AST, Token, TranslatorStack>>,
+) -> (bool, Option<State<AST, Token, TranslatorStack>>) {
     let mut contains = false;
     for state in states.iter() {
         if state.productions.len() != item.len() {
@@ -473,19 +481,23 @@ fn is_items_in_canonical_collection<AST: Clone, Token: Clone>(
     (contains, None)
 }
 
-fn compute_shift_reduce_productions<AST: Clone, Token: Clone>(
-    productions: &Vec<Production<AST, Token>>,
-) -> (Vec<Production<AST, Token>>, Vec<Production<AST, Token>>) {
-    let filter_by_dot_at_the_rightend =
-        |production: &Production<AST, Token>| production.cursor_pos == production.body.len();
+fn compute_shift_reduce_productions<AST: Clone, Token: Clone, TranslatorStack: Clone>(
+    productions: &Vec<Production<AST, Token, TranslatorStack>>,
+) -> (
+    Vec<Production<AST, Token, TranslatorStack>>,
+    Vec<Production<AST, Token, TranslatorStack>>,
+) {
+    let filter_by_dot_at_the_rightend = |production: &Production<AST, Token, TranslatorStack>| {
+        production.cursor_pos == production.body.len()
+    };
 
-    let reduce_productions: Vec<Production<AST, Token>> = productions
+    let reduce_productions: Vec<Production<AST, Token, TranslatorStack>> = productions
         .iter()
         .cloned()
         .filter(filter_by_dot_at_the_rightend)
         .collect();
 
-    let shift_productions: Vec<Production<AST, Token>> = productions
+    let shift_productions: Vec<Production<AST, Token, TranslatorStack>> = productions
         .iter()
         .cloned()
         .filter(|p| !filter_by_dot_at_the_rightend(p))

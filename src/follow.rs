@@ -6,8 +6,8 @@ use crate::{
     symbol::{unique_symbols, Symbol},
 };
 
-pub fn compute_follow_set<AST, Token>(
-    productions: &Vec<Production<AST, Token>>,
+pub fn compute_follow_set<AST, Token, TranslatorStack>(
+    productions: &Vec<Production<AST, Token, TranslatorStack>>,
 ) -> HashMap<Symbol, HashSet<String>> {
     let symbols: Vec<Symbol> = unique_symbols(productions);
     let non_terminals: Vec<Symbol> = symbols
@@ -26,7 +26,7 @@ pub fn compute_follow_set<AST, Token>(
         follow_map.insert(symbol.clone(), HashSet::new());
     });
 
-    let augment_production: Option<&Production<AST, Token>> = productions
+    let augment_production: Option<&Production<AST, Token, TranslatorStack>> = productions
         .iter()
         .filter(|prod| prod.head.eq(&String::from("S'")))
         .next();

@@ -4,16 +4,25 @@ use crate::{error::ParseError, symbol::Symbol};
 
 //T means AST
 #[derive(Clone)]
-pub struct Production<AST, Token> {
+pub struct Production<AST, Token, TranslatorStack> {
     pub head: String,
     pub body: Vec<Symbol>,
     pub cursor_pos: usize,
     pub index: usize,
     pub error_message: Option<String>,
-    pub action: Option<Arc<dyn Fn(&mut Vec<AST>, &mut Vec<Token>, &mut Vec<ParseError<Token>>)>>,
+    pub action: Option<
+        Arc<
+            dyn Fn(
+                &mut AST,
+                &mut Vec<Token>,
+                &mut Vec<TranslatorStack>,
+                &mut Vec<ParseError<Token>>,
+            ),
+        >,
+    >,
 }
 
-impl<AST, Token> std::fmt::Debug for Production<AST, Token> {
+impl<AST, Token, TranslatorStack> std::fmt::Debug for Production<AST, Token, TranslatorStack> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Production")
             .field("head", &self.head)
@@ -25,7 +34,7 @@ impl<AST, Token> std::fmt::Debug for Production<AST, Token> {
     }
 }
 
-impl<AST, Token> PartialEq for Production<AST, Token> {
+impl<AST, Token, TranslatorStack> PartialEq for Production<AST, Token, TranslatorStack> {
     fn eq(&self, other: &Self) -> bool {
         self.head == other.head
             && self.body == other.body
@@ -35,7 +44,7 @@ impl<AST, Token> PartialEq for Production<AST, Token> {
     }
 }
 
-impl<AST, Token> Production<AST, Token> {
+impl<AST, Token, TranslatorStack> Production<AST, Token, TranslatorStack> {
     pub fn next_symbol(&self) -> Option<&Symbol> {
         if self.cursor_pos == self.body.len() {
             None
