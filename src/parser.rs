@@ -29,7 +29,7 @@ impl<AST, Token, TranslatorStack> Parser<AST, Token, TranslatorStack>
 where
     AST: Clone + Debug,
     Token: Terminal + Debug + Clone,
-    TranslatorStack: Clone,
+    TranslatorStack: Clone + Debug,
 {
     pub fn new(
         productions: Vec<Production<AST, Token, TranslatorStack>>,
@@ -432,8 +432,6 @@ where
                 }
             }
         }
-
-        println!("tl_stack{:#?}", ast);
     }
 }
 
