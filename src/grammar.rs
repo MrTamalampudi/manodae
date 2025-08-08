@@ -36,6 +36,7 @@ macro_rules! grammar {
             $(
                 body_.push(Symbol::NONTERMINAL(stringify!($non_terminal).to_string()));
             )*
+            #[allow(unused_mut)]
             let mut production = Production {
                 head: stringify!($head).to_string(),
                 body: body_,

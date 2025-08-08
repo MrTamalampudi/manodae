@@ -8,4 +8,6 @@ pub mod parser;
 pub mod production;
 pub mod state;
 pub mod symbol;
-pub mod terminal;
+
+#[cfg(test)]
+mod tests;
