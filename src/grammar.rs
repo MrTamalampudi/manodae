@@ -32,7 +32,7 @@ macro_rules! grammar {
         let mut grammar = Grammar::new();
         $({
             $({let mut body_ : Vec<Symbol> = Vec::new();
-            $($(body_.push(Symbol::TERMINAL($terminal.to_string_c()));)*)?
+            $($(body_.push(Symbol::TERMINAL($terminal.to_string()));)*)?
             $(
                 body_.push(Symbol::NONTERMINAL(stringify!($non_terminal).to_string()));
             )*

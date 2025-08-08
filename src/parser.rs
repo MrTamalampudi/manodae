@@ -13,7 +13,6 @@ use crate::production::Production;
 use crate::state::State;
 use crate::symbol::unique_symbols;
 use crate::symbol::Symbol;
-use crate::terminal::Terminal;
 
 #[derive(Debug)]
 pub struct Parser<AST, Token, TranslatorStack> {
@@ -28,7 +27,7 @@ pub struct Parser<AST, Token, TranslatorStack> {
 impl<AST, Token, TranslatorStack> Parser<AST, Token, TranslatorStack>
 where
     AST: Clone + Debug,
-    Token: Terminal + Debug + Clone,
+    Token: ToString + Debug + Clone,
     TranslatorStack: Clone + Debug,
 {
     pub fn new(
@@ -324,7 +323,7 @@ where
         let mut input_iter = tokens_input.iter();
         let mut current_input = input_iter.next().unwrap();
         let mut previous_input = current_input;
-        let mut current_input_string = current_input.to_string_c();
+        let mut current_input_string = current_input.to_string();
         let mut top_state = self.lr0_automaton.first().unwrap();
         let mut translator_stack: Vec<TranslatorStack> = Vec::new();
         let mut input_token_stack: Vec<Token> = Vec::new();
@@ -343,7 +342,7 @@ where
 
                         previous_input = current_input;
                         current_input = input_iter.next().unwrap();
-                        current_input_string = current_input.to_string_c();
+                        current_input_string = current_input.to_string();
                     }
                     Action::REDUCE(production) => {
                         let production_ = self.productions.get(production.clone()).unwrap();
@@ -427,7 +426,7 @@ where
                         input_symbol_skip_count += 1;
                         previous_input = current_input;
                         current_input = input_iter.next().unwrap();
-                        current_input_string = current_input.to_string_c();
+                        current_input_string = current_input.to_string();
                     }
                 }
             }
