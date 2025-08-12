@@ -6,6 +6,7 @@ pub mod follow;
 pub mod grammar;
 pub mod parser;
 pub mod production;
+pub mod simplify_grammar;
 pub mod state;
 pub mod symbol;
 

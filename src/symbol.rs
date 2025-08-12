@@ -35,3 +35,12 @@ impl Symbol {
         matches!(self, Symbol::NONTERMINAL(_))
     }
 }
+
+impl ToString for Symbol {
+    fn to_string(&self) -> String {
+        match self {
+            Symbol::NONTERMINAL(string) | Self::TERMINAL(string) => string.clone(),
+            _ => String::from("None&&"),
+        }
+    }
+}

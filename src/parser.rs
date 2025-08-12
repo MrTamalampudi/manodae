@@ -10,6 +10,7 @@ use crate::error::ParseError;
 use crate::first::compute_first_set;
 use crate::follow::compute_follow_set;
 use crate::production::Production;
+use crate::simplify_grammar::eliminate_unit_productions;
 use crate::state::State;
 use crate::symbol::unique_symbols;
 use crate::symbol::Symbol;
@@ -31,15 +32,15 @@ where
     TranslatorStack: Clone + Debug,
 {
     pub fn new(
-        productions: Vec<Production<AST, Token, TranslatorStack>>,
+        productions: &mut Vec<Production<AST, Token, TranslatorStack>>,
     ) -> Parser<AST, Token, TranslatorStack> {
-        let mut productions_ = productions.clone();
+        let mut productions_ = eliminate_unit_productions(productions);
 
         //creating augmented production
         let start_symbol = productions_.first().unwrap();
         let augmented_production: Production<AST, Token, TranslatorStack> = Production {
             head: String::from("S'"),
-            body: vec![Symbol::NONTERMINAL(start_symbol.head.clone())],
+            body: vec![Symbol::NONTERMINAL(String::from("Start"))],
             cursor_pos: 0,
             index: 0,
             error_message: None,
@@ -403,7 +404,6 @@ where
                     .unwrap();
                 loop {
                     if error_production_follow_set.contains(&current_input_string) {
-                        //println!("error message:{:#?}", deduced_production);
                         if deduced_production.clone().unwrap().error_message.is_some() {
                             error_message =
                                 deduced_production.unwrap().error_message.unwrap().clone();

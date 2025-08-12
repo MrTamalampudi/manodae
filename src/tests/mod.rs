@@ -1,4 +1,5 @@
 mod basic;
+mod remove_unit_productions;
 mod tokens;
 
 #[derive(Debug, Clone)]

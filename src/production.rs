@@ -39,7 +39,6 @@ impl<AST, Token, TranslatorStack> PartialEq for Production<AST, Token, Translato
         self.head == other.head
             && self.body == other.body
             && self.cursor_pos == other.cursor_pos
-            && self.index == other.index
             && self.error_message == other.error_message
     }
 }
