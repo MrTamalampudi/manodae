@@ -1,9 +1,6 @@
-use std::{collections::HashSet, hash::Hash};
+use std::collections::HashSet;
 
-use crate::{
-    production::Production,
-    symbol::{unique_symbols, Symbol},
-};
+use crate::{production::Production, symbol::unique_symbols};
 
 //implemented based on following reference
 //github.com/MRTamalampudi/references/blob/main/toc-cd/eliminate_unit_productions.pdf
@@ -46,7 +43,7 @@ fn derivable<AST, Token, TranslatorStack>(
 }
 
 pub fn eliminate_unit_productions<AST: Clone, Token: Clone, TranslatorStack: Clone>(
-    productions: &mut Vec<Production<AST, Token, TranslatorStack>>,
+    productions: &Vec<Production<AST, Token, TranslatorStack>>,
 ) -> Vec<Production<AST, Token, TranslatorStack>> {
     let mut new_productions = productions.clone();
     let mut non_terminals: Vec<String> = unique_symbols(productions)
@@ -86,16 +83,29 @@ pub fn eliminate_unit_productions<AST: Clone, Token: Clone, TranslatorStack: Clo
     }
 
     let no_unit_productions: Vec<Production<AST, Token, TranslatorStack>> = new_productions
-        .iter_mut()
+        .iter()
+        .cloned()
         .filter(|production| production.body.len() != 1 || production.body[0].is_terminal())
-        .enumerate()
-        .map(|(index, production)| {
-            let mut new_prod = production.clone();
-            new_prod.index = index + 1;
-            new_prod
-        })
         .collect();
 
-    // println!("non unit_productins {:#?}", no_unit_productions);
+    //println!("non unit_productins {:#?}", no_unit_productions);
     no_unit_productions
+}
+
+pub fn eliminate_useless_productions<AST: Clone, Token: Clone, TranslatorStack: Clone>(
+    productions: Vec<Production<AST, Token, TranslatorStack>>,
+) -> Vec<Production<AST, Token, TranslatorStack>> {
+    let mut nt_production_bodies: HashSet<_> = productions
+        .iter()
+        .flat_map(|production| production.body.clone())
+        .filter(|symbol| symbol.is_non_terminal())
+        .map(|symbol| symbol.to_string())
+        .collect();
+    nt_production_bodies.insert(String::from("Start"));
+
+    productions
+        .iter()
+        .cloned()
+        .filter(|production| nt_production_bodies.contains(&production.head))
+        .collect()
 }

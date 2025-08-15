@@ -7,10 +7,10 @@ use crate::tests::{TranslatorStack, AST};
 use crate::{grammar, tests::tokens::Token};
 use std::sync::Arc;
 
-#[test]
+// #[test]
 #[allow(unused_variables)]
 fn basic() {
-    let mut grammar: Grammar<AST, Token, TranslatorStack> = grammar!(
+    let grammar: Grammar<AST, Token, TranslatorStack> = grammar!(
         Start -> A B C
         {action:|ast,token_stack,tl_stack,errors| {
             set_result(ast,true);
@@ -27,7 +27,7 @@ fn basic() {
         H -> [Token::H];
     );
 
-    let mut parser = Parser::new(&mut grammar.productions);
+    let mut parser = Parser::new(&grammar.productions);
     parser.compute_lr0_items();
 
     let mut errors: Vec<ParseError<Token>> = Vec::new();

@@ -9,15 +9,17 @@ use crate::{grammar, tests::tokens::Token};
 #[test]
 #[allow(unused_variables)]
 fn remove_unit_productions() {
-    let mut grammar: Grammar<AST, Token, TranslatorStack> = grammar!(
+    let grammar: Grammar<AST, Token, TranslatorStack> = grammar!(
         Start -> AA;
+
+        B-> B;
 
         AA -> A;
 
         A -> [Token::A];
     );
 
-    let mut parser = Parser::new(&mut grammar.productions);
+    let mut parser = Parser::new(&grammar.productions);
     parser.compute_lr0_items();
 
     // eliminate(&mut grammar.productions);

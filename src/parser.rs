@@ -11,6 +11,7 @@ use crate::first::compute_first_set;
 use crate::follow::compute_follow_set;
 use crate::production::Production;
 use crate::simplify_grammar::eliminate_unit_productions;
+use crate::simplify_grammar::eliminate_useless_productions;
 use crate::state::State;
 use crate::symbol::unique_symbols;
 use crate::symbol::Symbol;
@@ -32,9 +33,16 @@ where
     TranslatorStack: Clone + Debug,
 {
     pub fn new(
-        productions: &mut Vec<Production<AST, Token, TranslatorStack>>,
+        productions: &Vec<Production<AST, Token, TranslatorStack>>,
     ) -> Parser<AST, Token, TranslatorStack> {
         let mut productions_ = eliminate_unit_productions(productions);
+        productions_ = eliminate_useless_productions(productions_);
+
+        //populate index numbers of productions
+        productions_
+            .iter_mut()
+            .enumerate()
+            .for_each(|(index, production)| production.index = index + 1);
 
         //creating augmented production
         let augmented_production: Production<AST, Token, TranslatorStack> = Production {
