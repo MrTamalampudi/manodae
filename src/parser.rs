@@ -37,7 +37,6 @@ where
         let mut productions_ = eliminate_unit_productions(productions);
 
         //creating augmented production
-        let start_symbol = productions_.first().unwrap();
         let augmented_production: Production<AST, Token, TranslatorStack> = Production {
             head: String::from("S'"),
             body: vec![Symbol::NONTERMINAL(String::from("Start"))],
