@@ -14,7 +14,7 @@ fn remove_unit_productions() {
 
         B-> B;
 
-        AA -> A;
+        AA -> AA | A;
 
         A -> [Token::A];
     );

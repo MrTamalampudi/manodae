@@ -7,7 +7,7 @@ use crate::tests::{TranslatorStack, AST};
 use crate::{grammar, tests::tokens::Token};
 use std::sync::Arc;
 
-// #[test]
+#[test]
 #[allow(unused_variables)]
 fn basic() {
     let grammar: Grammar<AST, Token, TranslatorStack> = grammar!(
