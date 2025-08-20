@@ -2,12 +2,12 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     first::compute_first_set,
-    production_LR1::Production_LR1,
+    production::Production,
     symbol::{unique_symbols, Symbol},
 };
 
 pub fn compute_follow_set<AST, Token, TranslatorStack>(
-    productions: &Vec<&Production_LR1<AST, Token, TranslatorStack>>,
+    productions: &Vec<Production<AST, Token, TranslatorStack>>,
 ) -> HashMap<Symbol, HashSet<String>> {
     let symbols = unique_symbols(productions);
     let non_terminals: Vec<Symbol> = symbols
@@ -26,7 +26,7 @@ pub fn compute_follow_set<AST, Token, TranslatorStack>(
         follow_map.insert(symbol.clone(), HashSet::new());
     });
 
-    let augment_production: Option<&&Production_LR1<AST, Token, TranslatorStack>> = productions
+    let augment_production: Option<&Production<AST, Token, TranslatorStack>> = productions
         .iter()
         .filter(|prod| prod.head.eq(&String::from("S'")))
         .next();

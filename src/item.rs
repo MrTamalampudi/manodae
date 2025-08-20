@@ -2,8 +2,9 @@ use crate::{production::Production, symbol::Symbol};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Item<'a, AST, Token, TranslatorStack> {
-    production: &'a Production<AST, Token, TranslatorStack>,
-    cursor: u8,
+    pub production: &'a Production<AST, Token, TranslatorStack>,
+    pub cursor: u8,
+    pub lookaheads: Vec<Symbol>,
 }
 
 impl<'a, AST, Token, TranslatorStack> Item<'a, AST, Token, TranslatorStack> {

@@ -1,8 +1,8 @@
 //cfg grammar should be in bnf format
 
-use crate::production_LR1::Production_LR1;
+use crate::production::Production;
 
-pub type Grammar<AST, Token, TranslatorStack> = Vec<Production_LR1<AST, Token, TranslatorStack>>;
+pub type Grammar<AST, Token, TranslatorStack> = Vec<Production<AST, Token, TranslatorStack>>;
 
 #[macro_export]
 macro_rules! grammar {
@@ -17,7 +17,7 @@ macro_rules! grammar {
         );+;
     ) => {{
         let mut grammar = Vec::new();
-        let augmented_production = Production_LR1 {
+        let augmented_production = Production {
             head: String::from("S'"),
             body: vec![Symbol::NONTERMINAL(String::from("Start"))],
             error_message: None,
@@ -32,7 +32,7 @@ macro_rules! grammar {
                 body_.push(Symbol::NONTERMINAL(stringify!($non_terminal).to_string()));
             )*
             #[allow(unused_mut)]
-            let mut production = Production_LR1 {
+            let mut production = Production {
                 head: stringify!($head).to_string(),
                 body: body_,
                 error_message: None,

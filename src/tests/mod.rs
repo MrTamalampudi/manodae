@@ -1,6 +1,7 @@
+mod basic;
 mod tokens;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct AST {
     pub result: bool,
 }
@@ -11,5 +12,5 @@ impl AST {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TranslatorStack {}

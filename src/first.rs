@@ -1,12 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    production_LR1::Production_LR1,
+    production::Production,
     symbol::{unique_symbols, Symbol},
 };
 
 pub fn compute_first_set<AST, Token, TranslatorStack>(
-    productions: &Vec<&Production_LR1<AST, Token, TranslatorStack>>,
+    productions: &Vec<Production<AST, Token, TranslatorStack>>,
 ) -> HashMap<Symbol, HashSet<String>> {
     let symbols = unique_symbols(productions);
     let mut first_map: HashMap<Symbol, HashSet<String>> = HashMap::new();

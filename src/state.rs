@@ -1,13 +1,12 @@
 use std::{collections::HashMap, fmt::Debug};
 
-use crate::{action::Action, conflict::ConflictType, production::Production, symbol::Symbol};
+use crate::{action::Action, conflict::ConflictType, parser::Items, production::Production};
 
 #[derive(Debug, Clone)]
-pub struct State<AST, Token, TranslatorStack> {
+pub struct State<'a, AST, Token, TranslatorStack> {
     pub state: usize,
-    pub productions: Vec<Production<AST, Token, TranslatorStack>>,
-    pub transition_symbol: Symbol,
-    pub transition_productions: Vec<Production<AST, Token, TranslatorStack>>,
+    pub items: Items<'a, AST, Token, TranslatorStack>,
+    pub transition_productions: Vec<&'a Production<AST, Token, TranslatorStack>>,
     pub action: HashMap<String, Action>,
     pub goto: HashMap<String, usize>,
     pub conflicts: HashMap<String, ConflictType>,

@@ -9,7 +9,6 @@ pub mod grammar;
 pub mod item;
 pub mod parser;
 pub mod production;
-pub mod production_LR1;
 pub mod state;
 pub mod symbol;
 

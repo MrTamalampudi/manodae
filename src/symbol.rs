@@ -1,6 +1,6 @@
 use std::{collections::HashSet, fmt::Debug};
 
-use crate::production_LR1::Production_LR1;
+use crate::production::Production;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Symbol {
@@ -10,7 +10,7 @@ pub enum Symbol {
 }
 
 pub fn unique_symbols<AST, Token, TranslatorStack>(
-    productions: &Vec<&Production_LR1<AST, Token, TranslatorStack>>,
+    productions: &Vec<Production<AST, Token, TranslatorStack>>,
 ) -> HashSet<Symbol> {
     let mut symbols: HashSet<Symbol> = HashSet::new();
     for production in productions.iter() {
