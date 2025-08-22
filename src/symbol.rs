@@ -1,8 +1,8 @@
-use std::{collections::HashSet, fmt::Debug};
+use std::{collections::HashSet, fmt::Debug, hash::Hash};
 
 use crate::production::Production;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Symbol {
     TERMINAL(String),
     NONTERMINAL(String),

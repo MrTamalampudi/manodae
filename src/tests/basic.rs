@@ -11,21 +11,22 @@ use std::sync::Arc;
 #[test]
 fn basic() {
     let grammar: Grammar<AST, Token, TranslatorStack> = grammar!(
-        Start -> Expression;
+        Start -> E;
 
-        Expression  -> LiteralExpression
-        | OperatorExpression;
+        E  -> LE | OE;
 
-        LiteralExpression -> [Token::A] | [Token::B];
+        LE -> [Token::A];
 
-        OperatorExpression -> NegationExpression;
+        OE -> NE | CE;
 
-        NegationExpression -> [Token::C] Expression;
+        NE -> [Token::C] E;
 
-        // ComparisionExpression -> Expression Equality Expression;
+        CE -> E D E;
+
+        D -> [Token::D];
     );
     let mut parser = LR1_Parser::new(&grammar);
-    parser.items();
+    parser.construct_LALR_Table();
     // eliminate(&mut grammar.productions);
 
     // let mut errors: Vec<ParseError<Token>> = Vec::new();

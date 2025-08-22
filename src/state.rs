@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Debug};
 
-use crate::{action::Action, conflict::ConflictType, parser::Items, production::Production};
+use crate::{action::Action, conflict::ConflictType, item::Items, production::Production};
 
 #[derive(Debug, Clone)]
 pub struct State<'a, AST, Token, TranslatorStack> {

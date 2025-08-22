@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{hash::Hash, sync::Arc};
 
 use crate::{error::ParseError, symbol::Symbol};
 
@@ -17,6 +17,14 @@ pub struct Production<AST, Token, TranslatorStack> {
             ),
         >,
     >,
+}
+
+impl<AST, Token, TranslatorStack> Hash for Production<AST, Token, TranslatorStack> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.error_message.hash(state);
+        self.head.hash(state);
+        self.body.hash(state);
+    }
 }
 
 impl<AST, Token, TranslatorStack> std::fmt::Debug for Production<AST, Token, TranslatorStack> {
