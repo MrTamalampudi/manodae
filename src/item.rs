@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug, hash::Hash, ptr};
+use std::{fmt::Debug, hash::Hash, ptr};
 
 use indexmap::IndexMap;
 
@@ -31,9 +31,9 @@ impl<'a, AST, Token, TranslatorStack> Item<'a, AST, Token, TranslatorStack> {
     }
 }
 
-struct ItemProduction<'a, AST, Token, TranslatorStack> {
-    production: &'a Production<AST, Token, TranslatorStack>,
-    cursor: u8,
+pub struct ItemProduction<'a, AST, Token, TranslatorStack> {
+    pub production: &'a Production<AST, Token, TranslatorStack>,
+    pub cursor: u8,
 }
 
 impl<'a, AST, Token, TranslatorStack> PartialEq

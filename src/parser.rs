@@ -8,14 +8,14 @@ use crate::{
     follow::compute_follow_set,
     item::{Item, Items},
     production::Production,
+    state::State,
     symbol::{unique_symbols, Symbol},
 };
 
 #[derive(Debug)]
 pub struct LR1_Parser<'a, AST, Token, TranslatorStack> {
     pub productions: &'a Vec<Production<AST, Token, TranslatorStack>>,
-    pub items: Items<'a, AST, Token, TranslatorStack>,
-    pub LR1_automata: Vec<Items<'a, AST, Token, TranslatorStack>>,
+    pub LR1_automata: Vec<State<'a, AST, Token, TranslatorStack>>,
     pub symbols: HashSet<Symbol>, //every gramar symbol that exists in grammar
     pub follow_set: HashMap<Symbol, HashSet<String>>,
     pub first_set: HashMap<Symbol, HashSet<String>>,
@@ -42,7 +42,6 @@ where
 
         LR1_Parser {
             productions: productions,
-            items: Items(Vec::new()),
             LR1_automata: Vec::new(),
             symbols,
             first_set,
@@ -121,11 +120,11 @@ where
     // }
     fn goto(
         &self,
-        items: &Items<'a, AST, Token, TranslatorStack>,
+        items: &Vec<Item<'a, AST, Token, TranslatorStack>>,
         symbol: &Symbol,
-    ) -> Items<'a, AST, Token, TranslatorStack> {
-        let mut new_items = Items(vec![]);
-        for mut item in items.0.iter().cloned() {
+    ) -> State<'a, AST, Token, TranslatorStack> {
+        let mut new_items = vec![];
+        for mut item in items.iter().cloned() {
             let item_symbol = item.next_symbol();
             if item_symbol.is_none() {
                 continue;
@@ -134,10 +133,14 @@ where
                 continue;
             }
             item.advance_cursor();
-            new_items.0.push(item);
+            new_items.push(item);
         }
-        self.clousure(&mut new_items);
-        new_items
+        let transition_productions = new_items.clone();
+        let mut state = State::new(0, new_items.clone(), transition_productions);
+        let mut items = Items(new_items);
+        self.clousure(&mut items);
+        state.items = items.0;
+        state
     }
 
     // Algorithm
@@ -156,26 +159,37 @@ where
             cursor: 0,
             lookaheads: vec![Symbol::TERMINAL(String::from("EOF"))],
         };
-        let mut S0_items = Items(vec![augmented_item]);
-        self.clousure(&mut S0_items);
-        let mut LR1_automata = vec![S0_items];
+        let S0_items = vec![augmented_item];
+        let mut items = Items(S0_items);
+        self.clousure(&mut items);
+        let mut LR1_automata = vec![State {
+            transition_productions: vec![],
+            index: 0,
+            items: items.0,
+        }];
         let mut states_count = 0;
         let mut states_iterated_count = 0;
         while LR1_automata.len().ne(&states_count) {
             states_count = LR1_automata.len();
-            let mut new_items = vec![];
+            let mut new_state = vec![];
             for states_index in states_iterated_count..LR1_automata.len() {
-                let items = LR1_automata.get(states_index).unwrap();
+                let state = LR1_automata.get(states_index).unwrap();
                 for symbol in self.symbols.iter() {
-                    let goto_productions = self.goto(items, symbol);
-                    if !goto_productions.0.is_empty() && !LR1_automata.contains(&goto_productions) {
-                        new_items.push(goto_productions);
+                    let goto_productions_state = self.goto(&state.items, symbol);
+                    if !goto_productions_state.items.is_empty()
+                        && !LR1_automata.contains(&goto_productions_state)
+                    {
+                        new_state.push(goto_productions_state);
                     }
                 }
                 states_iterated_count += 1;
             }
-            LR1_automata.extend(new_items);
+            LR1_automata.extend(new_state);
         }
+        LR1_automata
+            .iter_mut()
+            .enumerate()
+            .for_each(|(index, state)| state.index = index);
         self.LR1_automata = LR1_automata;
         println!("LR_automata: {:#?}", self.LR1_automata);
         println!("LR_automata: {:#?}", self.LR1_automata.len());
