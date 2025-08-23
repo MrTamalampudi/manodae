@@ -108,8 +108,8 @@ where
                 items_iterated_count += 1;
             }
             items.0.extend(new_items.0);
-            items.merge_cores()
         }
+        items.merge_cores()
     }
 
     // Algorithm
