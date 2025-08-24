@@ -32,9 +32,6 @@ where
     pub fn new(
         productions: &Vec<Production<AST, Token, TranslatorStack>>,
     ) -> LR1_Parser<AST, Token, TranslatorStack> {
-        // let mut productions_ = eliminate_unit_productions(productions);
-        // productions_ = eliminate_useless_productions(productions_);
-
         //collect all grammar symbols without duplicates
         let symbols: HashSet<Symbol> = unique_symbols(&productions);
 
@@ -52,9 +49,9 @@ where
     }
 
     // Algorithm
-    // void CLOSURE(𝐼:items) {
+    // void 𝐶𝐿𝑂𝑆𝑈𝑅𝐸(𝐼:items) {
     //   repeat
-    //       for (each item [A → 𝛼.𝐵𝛽,𝑎] in 𝐼 )
+    //       for (each item [𝐴 → 𝛼.𝐵𝛽,𝑎] in 𝐼 )
     //           for ( each production [𝐵 → 𝛾] in 𝐺' )
     //               for ( each terminal 𝑏 in FIRST(𝛽𝑎) )
     //                   add [𝐵 → .𝛾,𝑏] to set 𝐼
@@ -113,11 +110,11 @@ where
     }
 
     // Algorithm
-    // State GOTO(𝐼:items, 𝑋:symbol) {
+    // State 𝐺𝑂𝑇𝑂(𝐼:items, 𝑋:symbol) {
     //   initialize 𝐽 to be the empty set;
-    //   for ( each item [A → 𝛼.𝑋𝛽,𝑎] in 𝐼)
-    //       add item [A → 𝛼𝑋.𝛽,𝑎] to set 𝐽;
-    //   return CLOSURE(𝐽);
+    //   for ( each item [𝐴 → 𝛼.𝑋𝛽,𝑎] in 𝐼)
+    //       add item [𝐴 → 𝛼𝑋.𝛽,𝑎] to set 𝐽;
+    //   return 𝐶𝐿𝑂𝑆𝑈𝑅𝐸(𝐽);
     // }
     fn goto(
         &self,
@@ -144,13 +141,13 @@ where
     }
 
     // Algorithm
-    // void items(𝐺') {
-    //   initialize 𝐶 to { CLOSURE({[𝑆' → .𝑆,$]}) };
+    // void 𝐼𝑇𝐸𝑀𝑆(𝐺') {
+    //   initialize 𝐶 to { 𝐶𝐿𝑂𝑆𝑈𝑅𝐸({[𝑆' → .𝑆,$]}) };
     //   repeat
     //       for ( each set of items 𝐼 in 𝐶 )
     //           for ( each grammar symbol 𝑋 )
-    //               if ( GOTO(𝐼, 𝑋) is not empty and not in 𝐶 )
-    //                   add GOTO(𝐼, 𝑋) to 𝐶;
+    //               if ( 𝐺𝑂𝑇𝑂(𝐼, 𝑋) is not empty and not in 𝐶 )
+    //                   add 𝐺𝑂𝑇𝑂(𝐼, 𝑋) to 𝐶;
     //   until no new sets of items are added to 𝐶;
     // }
     fn items(&mut self) {
@@ -190,10 +187,31 @@ where
             .enumerate()
             .for_each(|(index, state)| state.index = index);
         self.LR1_automata = LR1_automata;
-        // println!("LR_automata: {:#?}", self.LR1_automata);
-        // println!("LR_automata: {:#?}", self.LR1_automata.len());
     }
 
+    // Algorithm
+    // 𝐈𝐍𝐏𝐔𝐓 : An augmented grammar 𝐺'
+    // 𝐎𝐔𝐓𝐏𝐔𝐓 : The 𝐿𝐴𝐿𝑅 parsing-table functions 𝐴𝐶𝑇𝐼𝑂𝑁 and 𝐺𝑂𝑇𝑂 for 𝐺'
+    // 𝐌𝐄𝐓𝐇𝐎𝐃 :
+    //  1. Construct 𝐶 = {𝐼₀,𝐼₁,...,𝐼ₙ}, the collection of sets of 𝐿𝑅(1) items
+    //  2. For each core present among the set of 𝐿𝑅(1) items, find all sets
+    //     having that core, and replace these sets by their union.
+    //  3. Let 𝐶' = {𝐽₀,𝐽₁,...,𝐽ₙ} be the resulting sets of 𝐿𝑅(1) items.
+    //  4. State 𝑖 of the parser is constructed from 𝐽ᵢ. The parsing action for
+    //     state 𝑖 us determined as follows
+    //     (a) If [𝐴 → 𝛼.𝑎𝛽,𝑏] is in 𝐽ᵢ and 𝐺𝑂𝑇𝑂(𝐽ᵢ,𝑎) = 𝐽ₖ, then set 𝐴𝐶𝑇𝐼𝑂𝑁[𝑖,𝑎]
+    //         to "shift 𝑘". Here 𝑎 must be a terminal.
+    //     (b) If [𝐴 → 𝛼.,𝑎] is in 𝐽ᵢ, 𝐴 ≠ 𝑆', then set 𝐴𝐶𝑇𝐼𝑂𝑁[𝑖,𝑎] to
+    //         "reduce 𝐴 → 𝛼".
+    //     (c) If [𝑆' → 𝑆.,$] is in 𝐽ᵢ, the set then set 𝐴𝐶𝑇𝐼𝑂𝑁[𝑖,𝑎] to "accept".
+    //     If any conflicting actions result from above rules, we say the
+    //     grammar is not 𝐿𝐴𝐿𝑅(1). The algorithm fails to produce a parser in this
+    //     case.
+    //  5. The goto transitions for state 𝑖 are constructed for all nonterminals
+    //     𝐴 using the rule: If 𝐺𝑂𝑇𝑂(𝐽ᵢ,𝐴) = 𝐽ₖ, then 𝐺𝑂𝑇𝑂[𝑖,𝐴] = 𝑘.
+    //  6. All entries not defined by rules (4) and (5) are made "error".
+    //  7. Then intitial state of the parser is the one constructed from the set
+    //     of items containing [𝑆' → .𝑆,$]
     pub fn construct_LALR_Table(&mut self) {
         self.items();
         self.LR1_automata.merge_sets();
