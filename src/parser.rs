@@ -6,7 +6,7 @@ use std::{
 use crate::{
     first::compute_first_set,
     follow::compute_follow_set,
-    item::{Item, Items},
+    item::{Item, ItemVecExtension},
     production::Production,
     state::{State, StateVecExtension},
     symbol::{unique_symbols, Symbol},
@@ -60,14 +60,14 @@ where
     //                   add [𝐵 → .𝛾,𝑏] to set 𝐼
     //   until no more items are added to 𝐼
     // }
-    fn clousure(&self, items: &mut Items<'a, AST, Token, TranslatorStack>) {
+    fn clousure(&self, items: &mut Vec<Item<'a, AST, Token, TranslatorStack>>) {
         let mut items_count = 0;
         let mut items_iterated_count = 0;
-        while items.0.len().ne(&items_count) {
-            items_count = items.0.len();
-            let mut new_items = Items(Vec::new());
-            for items_index in items_iterated_count..items.0.len() {
-                let item = items.0.get(items_index).unwrap();
+        while items.len().ne(&items_count) {
+            items_count = items.len();
+            let mut new_items = Vec::new();
+            for items_index in items_iterated_count..items.len() {
+                let item = items.get(items_index).unwrap();
                 let B = item.next_symbol();
                 let beta = item.production.body.get((item.cursor + 1) as usize);
                 let first_of = if let Some(beta) = beta {
@@ -100,16 +100,16 @@ where
                         cursor: 0,
                         lookaheads: lookaheads,
                     };
-                    if items.0.custom_contains(&item_) || new_items.0.custom_contains(&item_) {
+                    if items.custom_contains(&item_) || new_items.custom_contains(&item_) {
                         continue;
                     }
-                    new_items.0.push(item_);
+                    new_items.push(item_);
                 }
                 items_iterated_count += 1;
             }
-            items.0.extend(new_items.0);
+            items.extend(new_items);
         }
-        items.merge_cores()
+        items.merge_cores();
     }
 
     // Algorithm
@@ -138,9 +138,8 @@ where
         }
         let transition_productions = new_items.clone();
         let mut state = State::new(0, new_items.clone(), transition_productions);
-        let mut items = Items(new_items);
-        self.clousure(&mut items);
-        state.items = items.0;
+        self.clousure(&mut new_items);
+        state.items = new_items;
         state
     }
 
@@ -160,13 +159,12 @@ where
             cursor: 0,
             lookaheads: vec![Symbol::TERMINAL(String::from("EOF"))],
         };
-        let S0_items = vec![augmented_item];
-        let mut items = Items(S0_items);
-        self.clousure(&mut items);
+        let mut S0_items = vec![augmented_item];
+        self.clousure(&mut S0_items);
         let mut LR1_automata = vec![State {
             transition_productions: vec![],
             index: 0,
-            items: items.0,
+            items: S0_items,
         }];
         let mut states_count = 0;
         let mut states_iterated_count = 0;

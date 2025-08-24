@@ -63,21 +63,23 @@ impl<'a, AST, Token, TranslatorStack> Item<'a, AST, Token, TranslatorStack> {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Items<'a, AST, Token, TranslatorStack>(pub Vec<Item<'a, AST, Token, TranslatorStack>>);
+pub trait ItemVecExtension {
+    fn merge_cores(&mut self);
+}
 
-impl<'a, AST, Token, TranslatorStack> Items<'a, AST, Token, TranslatorStack>
+impl<'a, AST, Token, TranslatorStack> ItemVecExtension
+    for Vec<Item<'a, AST, Token, TranslatorStack>>
 where
     AST: PartialEq + Clone + Debug,
     Token: PartialEq + Clone + Debug,
     TranslatorStack: PartialEq + Clone + Debug,
 {
-    pub fn merge_cores(&mut self) {
+    fn merge_cores(&mut self) {
         let mut new_items: IndexMap<
             Item<AST, Token, TranslatorStack>,
             Item<AST, Token, TranslatorStack>,
         > = IndexMap::new();
-        for item in self.0.iter() {
+        for item in self.iter() {
             new_items
                 .entry(item.clone())
                 .and_modify(|new_item: &mut Item<'a, AST, Token, TranslatorStack>| {
@@ -89,7 +91,7 @@ where
                 })
                 .or_insert(item.clone());
         }
-        self.0.clear();
-        self.0.extend(new_items.into_values().collect::<Vec<_>>());
+        self.clear();
+        self.extend(new_items.into_values().collect::<Vec<_>>());
     }
 }

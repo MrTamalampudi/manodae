@@ -6,7 +6,7 @@ use std::{
 use indexmap::IndexMap;
 
 use crate::{
-    item::{Item, Items},
+    item::{Item, ItemVecExtension},
     traits::VecExtension,
 };
 
@@ -66,8 +66,6 @@ where
     }
 }
 
-// pub struct States<'a, AST, Token, TranslatorStack>(pub Vec<State<'a, AST, Token, TranslatorStack>>);
-
 pub trait StateVecExtension {
     fn merge_sets(&mut self);
 }
@@ -94,15 +92,9 @@ where
                         .extend(state.transition_productions.clone());
                 })
                 .or_insert(state.clone());
-            let mut state_items = Items(state_entry.items.clone());
-            let mut state_transition_productions =
-                Items(state_entry.transition_productions.clone());
-            state_items.merge_cores();
-            state_transition_productions.merge_cores();
-            state_entry.items = state_items.0;
-            state_entry.transition_productions = state_transition_productions.0;
+            state_entry.items.merge_cores();
+            state_entry.transition_productions.merge_cores();
         }
-        let keys = new_states.clone().into_keys().collect::<Vec<_>>();
         self.clear();
         self.extend(new_states.into_values().collect::<Vec<_>>());
     }
