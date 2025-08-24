@@ -2,13 +2,43 @@ use std::{fmt::Debug, hash::Hash, ptr};
 
 use indexmap::IndexMap;
 
-use crate::{production::Production, symbol::Symbol};
+use crate::{production::Production, symbol::Symbol, traits::VecExtension};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Item<'a, AST, Token, TranslatorStack> {
     pub production: &'a Production<AST, Token, TranslatorStack>,
     pub cursor: u8,
     pub lookaheads: Vec<Symbol>,
+}
+
+impl<'a, AST, Token, TranslatorStack> PartialEq for Item<'a, AST, Token, TranslatorStack> {
+    fn eq(&self, other: &Self) -> bool {
+        ptr::eq(self.production, other.production) && self.cursor == other.cursor
+    }
+}
+
+impl<'a, AST, Token, TranslatorStack> Eq for Item<'a, AST, Token, TranslatorStack> {}
+
+impl<'a, AST, Token, TranslatorStack> Hash for Item<'a, AST, Token, TranslatorStack> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        ptr::hash(self.production, state);
+        self.cursor.hash(state);
+    }
+}
+
+impl<'a, AST, Token, TranslatorStack> VecExtension<Item<'a, AST, Token, TranslatorStack>>
+    for Vec<Item<'a, AST, Token, TranslatorStack>>
+{
+    fn custom_contains(&self, other: &Item<'a, AST, Token, TranslatorStack>) -> bool {
+        self.iter().any(|item| {
+            ptr::eq(item.production, other.production)
+                && item.cursor == other.cursor
+                && item.lookaheads == other.lookaheads
+        })
+    }
+    // fn custom_eq(&self, others: Vec<Item<'a, AST, Token, TranslatorStack>>) -> bool {
+    //     self.iter().any(|item|)
+    // }
 }
 
 impl<'a, AST, Token, TranslatorStack> Item<'a, AST, Token, TranslatorStack> {
@@ -26,30 +56,10 @@ impl<'a, AST, Token, TranslatorStack> Item<'a, AST, Token, TranslatorStack> {
         self.production.head == String::from("S'")
     }
 
-    pub fn is_core_eq(&self, other: &Item<AST, Token, TranslatorStack>) -> bool {
-        ptr::eq(self.production, other.production) && self.cursor == other.cursor
-    }
-}
-
-pub struct ItemProduction<'a, AST, Token, TranslatorStack> {
-    pub production: &'a Production<AST, Token, TranslatorStack>,
-    pub cursor: u8,
-}
-
-impl<'a, AST, Token, TranslatorStack> PartialEq
-    for ItemProduction<'a, AST, Token, TranslatorStack>
-{
-    fn eq(&self, other: &Self) -> bool {
-        ptr::eq(self.production, other.production) && self.cursor == other.cursor
-    }
-}
-
-impl<'a, AST, Token, TranslatorStack> Eq for ItemProduction<'a, AST, Token, TranslatorStack> {}
-
-impl<'a, AST, Token, TranslatorStack> Hash for ItemProduction<'a, AST, Token, TranslatorStack> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        ptr::hash(self.production, state);
-        self.cursor.hash(state);
+    pub fn is_eq(&self, other: &Item<AST, Token, TranslatorStack>) -> bool {
+        ptr::eq(self.production, other.production)
+            && self.cursor == other.cursor
+            && self.lookaheads == other.lookaheads
     }
 }
 
@@ -64,16 +74,12 @@ where
 {
     pub fn merge_cores(&mut self) {
         let mut new_items: IndexMap<
-            ItemProduction<AST, Token, TranslatorStack>,
+            Item<AST, Token, TranslatorStack>,
             Item<AST, Token, TranslatorStack>,
         > = IndexMap::new();
         for item in self.0.iter() {
-            let item_production = ItemProduction {
-                production: item.production,
-                cursor: item.cursor,
-            };
             new_items
-                .entry(item_production)
+                .entry(item.clone())
                 .and_modify(|new_item: &mut Item<'a, AST, Token, TranslatorStack>| {
                     for la in item.lookaheads.iter() {
                         if !new_item.lookaheads.contains(la) {

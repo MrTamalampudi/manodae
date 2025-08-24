@@ -8,8 +8,9 @@ use crate::{
     follow::compute_follow_set,
     item::{Item, Items},
     production::Production,
-    state::State,
+    state::{State, StateVecExtension},
     symbol::{unique_symbols, Symbol},
+    traits::VecExtension,
 };
 
 #[derive(Debug)]
@@ -99,7 +100,7 @@ where
                         cursor: 0,
                         lookaheads: lookaheads,
                     };
-                    if items.0.contains(&item_) || new_items.0.contains(&item_) {
+                    if items.0.custom_contains(&item_) || new_items.0.custom_contains(&item_) {
                         continue;
                     }
                     new_items.0.push(item_);
@@ -177,7 +178,7 @@ where
                 for symbol in self.symbols.iter() {
                     let goto_productions_state = self.goto(&state.items, symbol);
                     if !goto_productions_state.items.is_empty()
-                        && !LR1_automata.contains(&goto_productions_state)
+                        && !LR1_automata.custom_contains(&goto_productions_state)
                     {
                         new_state.push(goto_productions_state);
                     }
@@ -191,11 +192,14 @@ where
             .enumerate()
             .for_each(|(index, state)| state.index = index);
         self.LR1_automata = LR1_automata;
-        println!("LR_automata: {:#?}", self.LR1_automata);
-        println!("LR_automata: {:#?}", self.LR1_automata.len());
+        // println!("LR_automata: {:#?}", self.LR1_automata);
+        // println!("LR_automata: {:#?}", self.LR1_automata.len());
     }
 
     pub fn construct_LALR_Table(&mut self) {
         self.items();
+        self.LR1_automata.merge_sets();
+        println!("LR_automata: {:#?}", self.LR1_automata);
+        println!("LR_automata: {:#?}", self.LR1_automata.len());
     }
 }

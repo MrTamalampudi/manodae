@@ -45,6 +45,8 @@ impl<AST, Token, TranslatorStack> PartialEq for Production<AST, Token, Translato
     }
 }
 
+impl<AST, Token, TranslatorStack> Eq for Production<AST, Token, TranslatorStack> {}
+
 impl<AST, Token, TranslatorStack> Production<AST, Token, TranslatorStack> {
     pub fn is_augmented_production(&self) -> bool {
         self.head == String::from("S'")
