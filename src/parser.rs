@@ -12,7 +12,7 @@ use crate::{
     item::{Item, ItemVecExtension},
     production::Production,
     state::{State, StateVecExtension},
-    symbol::{self, unique_symbols, Symbol},
+    symbol::{unique_symbols, Symbol},
     traits::VecExtension,
 };
 
