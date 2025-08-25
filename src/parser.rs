@@ -12,7 +12,7 @@ use crate::{
     item::{Item, ItemVecExtension},
     production::Production,
     state::{State, StateVecExtension},
-    symbol::{unique_symbols, Symbol},
+    symbol::{self, unique_symbols, Symbol},
     traits::VecExtension,
 };
 
@@ -251,65 +251,56 @@ where
         });
 
         for state in self.LR1_automata.iter() {
-            for symbol in self.symbols.iter() {
-                for item in state.items.iter() {
-                    let next_symbol = item.next_symbol();
-                    if next_symbol.is_none() {
-                        if item
-                            .production
-                            .head
-                            .ne(&AUGMENTED_PRODUCTION_HEAD.to_string())
-                        {
-                            action
-                                .entry(state)
-                                .and_modify(|map| {
-                                    item.lookaheads.iter().for_each(|lookahead| {
-                                        map.insert(
-                                            lookahead.clone(),
-                                            Action::REDUCE(item.production),
-                                        );
-                                    });
-                                })
-                                .or_insert(IndexMap::from([(
-                                    symbol.clone(),
-                                    Action::REDUCE(item.production),
-                                )]));
-                        } else {
-                            action.entry(state).insert_entry(IndexMap::from([(
-                                Symbol::TERMINAL(String::from("EOF")),
-                                Action::ACCEPT,
-                            )]));
-                        }
+            for item in state.items.iter() {
+                let next_symbol = item.next_symbol();
+                if next_symbol.is_none() {
+                    if item
+                        .production
+                        .head
+                        .ne(&AUGMENTED_PRODUCTION_HEAD.to_string())
+                    {
+                        let mut map = IndexMap::new();
+                        item.lookaheads.iter().for_each(|lookahead| {
+                            map.insert(lookahead.clone(), Action::REDUCE(item.production));
+                        });
+                        action.entry(state).insert_entry(map);
+                    } else {
+                        action.entry(state).insert_entry(IndexMap::from([(
+                            Symbol::TERMINAL(String::from("EOF")),
+                            Action::ACCEPT,
+                        )]));
                     }
-                    if let Symbol::TERMINAL(_) = symbol {
-                        let mut item_ = item.clone();
-                        item_.advance_cursor();
-                        let item_goto_state = transition_prod_map.get(&item_);
-                        if item_goto_state.is_some() {
-                            action.entry(state).insert_entry(IndexMap::from([(
-                                symbol.clone(),
-                                Action::SHIFT(item_goto_state.unwrap()),
-                            )]));
-                        }
-                    }
-                    if let Symbol::NONTERMINAL(_) = symbol {
-                        let mut item_ = item.clone();
-                        item_.advance_cursor();
-                        let item_goto_state = transition_prod_map.get(&item_);
-                        if item_goto_state.is_some() {
-                            goto.entry(state).insert_entry(IndexMap::from([(
-                                symbol.clone(),
-                                *item_goto_state.unwrap(),
-                            )]));
-                        }
-                    }
+                    continue;
+                }
+                let symbol = next_symbol.unwrap();
+                let mut item_ = item.clone();
+                item_.advance_cursor();
+                let item_goto_state = transition_prod_map.get(&item_);
+                if item_goto_state.is_none() {
+                    continue;
+                }
+                if let Symbol::TERMINAL(_) = symbol {
+                    action
+                        .entry(state)
+                        .and_modify(|map| {
+                            map.insert(symbol.clone(), Action::SHIFT(item_goto_state.unwrap()));
+                        })
+                        .or_insert(IndexMap::from([(
+                            symbol.clone(),
+                            Action::SHIFT(item_goto_state.unwrap()),
+                        )]));
+                }
+                if let Symbol::NONTERMINAL(_) = symbol {
+                    goto.entry(state).insert_entry(IndexMap::from([(
+                        symbol.clone(),
+                        *item_goto_state.unwrap(),
+                    )]));
                 }
             }
         }
         self.action = action;
         self.goto = goto;
         println!("action: {:#?}", self.action);
-        println!("action_len: {:#?}", self.action.len());
     }
 }
 
