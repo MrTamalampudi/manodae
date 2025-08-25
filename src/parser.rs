@@ -3,7 +3,10 @@ use std::{
     fmt::Debug,
 };
 
+use indexmap::IndexMap;
+
 use crate::{
+    action::Action,
     first::compute_first_set,
     follow::compute_follow_set,
     item::{Item, ItemVecExtension},
@@ -13,17 +16,27 @@ use crate::{
     traits::VecExtension,
 };
 
+const AUGMENTED_PRODUCTION_HEAD: &'static str = "S'";
+
 #[derive(Debug)]
-pub struct LR1_Parser<'a, AST, Token, TranslatorStack> {
+pub struct LR1_Parser<'a, 'b, AST, Token, TranslatorStack> {
     pub productions: &'a Vec<Production<AST, Token, TranslatorStack>>,
     pub LR1_automata: Vec<State<'a, AST, Token, TranslatorStack>>,
     pub symbols: HashSet<Symbol>, //every gramar symbol that exists in grammar
     pub follow_set: HashMap<Symbol, HashSet<String>>,
     pub first_set: HashMap<Symbol, HashSet<String>>,
     pub conflicts: bool,
+    pub goto: IndexMap<
+        &'b State<'a, AST, Token, TranslatorStack>,
+        IndexMap<Symbol, &'b State<'a, AST, Token, TranslatorStack>>,
+    >,
+    pub action: IndexMap<
+        &'b State<'a, AST, Token, TranslatorStack>,
+        IndexMap<Symbol, Action<'a, 'b, AST, Token, TranslatorStack>>,
+    >,
 }
 
-impl<'a, AST, Token, TranslatorStack> LR1_Parser<'a, AST, Token, TranslatorStack>
+impl<'a, 'b, AST, Token, TranslatorStack> LR1_Parser<'a, 'b, AST, Token, TranslatorStack>
 where
     AST: Clone + Debug + PartialEq,
     Token: ToString + Debug + Clone + PartialEq,
@@ -45,6 +58,8 @@ where
             first_set,
             follow_set,
             conflicts: false,
+            action: IndexMap::new(),
+            goto: IndexMap::new(),
         }
     }
 
@@ -212,10 +227,91 @@ where
     //  6. All entries not defined by rules (4) and (5) are made "error".
     //  7. Then intitial state of the parser is the one constructed from the set
     //     of items containing [𝑆' → .𝑆,$]
-    pub fn construct_LALR_Table(&mut self) {
+    pub fn construct_LALR_Table(&'b mut self) {
         self.items();
         self.LR1_automata.merge_sets();
-        println!("LR_automata: {:#?}", self.LR1_automata);
-        println!("LR_automata: {:#?}", self.LR1_automata.len());
+        let mut action: IndexMap<
+            &State<AST, Token, TranslatorStack>,
+            IndexMap<Symbol, Action<AST, Token, TranslatorStack>>,
+        > = IndexMap::new();
+        let mut goto: IndexMap<
+            &State<AST, Token, TranslatorStack>,
+            IndexMap<Symbol, &State<AST, Token, TranslatorStack>>,
+        > = IndexMap::new();
+
+        let mut transition_prod_map: IndexMap<
+            Item<AST, Token, TranslatorStack>,
+            &State<AST, Token, TranslatorStack>,
+        > = IndexMap::new();
+
+        self.LR1_automata.iter().for_each(|state| {
+            for item in state.transition_productions.iter() {
+                transition_prod_map.entry(item.clone()).or_insert(state);
+            }
+        });
+
+        for state in self.LR1_automata.iter() {
+            for symbol in self.symbols.iter() {
+                for item in state.items.iter() {
+                    let next_symbol = item.next_symbol();
+                    if next_symbol.is_none() {
+                        if item
+                            .production
+                            .head
+                            .ne(&AUGMENTED_PRODUCTION_HEAD.to_string())
+                        {
+                            action
+                                .entry(state)
+                                .and_modify(|map| {
+                                    item.lookaheads.iter().for_each(|lookahead| {
+                                        map.insert(
+                                            lookahead.clone(),
+                                            Action::REDUCE(item.production),
+                                        );
+                                    });
+                                })
+                                .or_insert(IndexMap::from([(
+                                    symbol.clone(),
+                                    Action::REDUCE(item.production),
+                                )]));
+                        } else {
+                            action.entry(state).insert_entry(IndexMap::from([(
+                                Symbol::TERMINAL(String::from("EOF")),
+                                Action::ACCEPT,
+                            )]));
+                        }
+                    }
+                    if let Symbol::TERMINAL(_) = symbol {
+                        let mut item_ = item.clone();
+                        item_.advance_cursor();
+                        let item_goto_state = transition_prod_map.get(&item_);
+                        if item_goto_state.is_some() {
+                            action.entry(state).insert_entry(IndexMap::from([(
+                                symbol.clone(),
+                                Action::SHIFT(item_goto_state.unwrap()),
+                            )]));
+                        }
+                    }
+                    if let Symbol::NONTERMINAL(_) = symbol {
+                        let mut item_ = item.clone();
+                        item_.advance_cursor();
+                        let item_goto_state = transition_prod_map.get(&item_);
+                        if item_goto_state.is_some() {
+                            goto.entry(state).insert_entry(IndexMap::from([(
+                                symbol.clone(),
+                                *item_goto_state.unwrap(),
+                            )]));
+                        }
+                    }
+                }
+            }
+        }
+        self.action = action;
+        self.goto = goto;
+        println!("action: {:#?}", self.action);
+        println!("action_len: {:#?}", self.action.len());
     }
 }
+
+//Action Hashmap<State,HashMap<Terminal,ACTION(SHIFT STATE/REDUCE PRODUCTION)>>
+//Goto HashMap<State,HahshMap<NonTerminal,State>>
