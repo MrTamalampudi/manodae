@@ -230,10 +230,12 @@ where
     pub fn construct_LALR_Table(&'b mut self) {
         self.items();
         self.LR1_automata.merge_sets();
+
         let mut action: IndexMap<
             &State<AST, Token, TranslatorStack>,
             IndexMap<Symbol, Action<AST, Token, TranslatorStack>>,
         > = IndexMap::new();
+
         let mut goto: IndexMap<
             &State<AST, Token, TranslatorStack>,
             IndexMap<Symbol, &State<AST, Token, TranslatorStack>>,
@@ -291,18 +293,19 @@ where
                         )]));
                 }
                 if let Symbol::NONTERMINAL(_) = symbol {
-                    goto.entry(state).insert_entry(IndexMap::from([(
-                        symbol.clone(),
-                        *item_goto_state.unwrap(),
-                    )]));
+                    goto.entry(state)
+                        .and_modify(|map| {
+                            map.insert(symbol.clone(), *item_goto_state.unwrap());
+                        })
+                        .or_insert(IndexMap::from([(
+                            symbol.clone(),
+                            *item_goto_state.unwrap(),
+                        )]));
                 }
             }
         }
         self.action = action;
         self.goto = goto;
-        println!("action: {:#?}", self.action);
+        println!("action: {:#?}", self.goto);
     }
 }
-
-//Action Hashmap<State,HashMap<Terminal,ACTION(SHIFT STATE/REDUCE PRODUCTION)>>
-//Goto HashMap<State,HahshMap<NonTerminal,State>>
