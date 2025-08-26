@@ -51,4 +51,8 @@ impl<AST, Token, TranslatorStack> Production<AST, Token, TranslatorStack> {
     pub fn is_augmented_production(&self) -> bool {
         self.head == String::from("S'")
     }
+
+    pub fn body_len(&self) -> usize {
+        self.body.len()
+    }
 }

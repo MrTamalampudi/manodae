@@ -1,12 +1,14 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
+    process::{exit, ExitCode},
 };
 
 use indexmap::IndexMap;
 
 use crate::{
     action::Action,
+    error::ParseError,
     first::compute_first_set,
     follow::compute_follow_set,
     item::{Item, ItemVecExtension},
@@ -18,7 +20,7 @@ use crate::{
 
 const AUGMENTED_PRODUCTION_HEAD: &'static str = "S'";
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LR1_Parser<'a, 'b, AST, Token, TranslatorStack> {
     pub productions: &'a Vec<Production<AST, Token, TranslatorStack>>,
     pub LR1_automata: Vec<State<'a, AST, Token, TranslatorStack>>,
@@ -307,5 +309,180 @@ where
         self.action = action;
         self.goto = goto;
         println!("action: {:#?}", self.goto);
+    }
+
+    //LR-Parsing Algorithm
+    // 𝐈𝐍𝐏𝐔𝐓 : An input string 𝑤 and LR-parsing table with functions
+    // 𝐴𝐶𝑇𝐼𝑂𝑁 and 𝐺𝑂𝑇𝑂 for a grammar 𝐺
+    //
+    // 𝐎𝐔𝐓𝐏𝐔𝐓 : If 𝑤 is not in 𝐿(𝐺), an error result
+    //
+    // 𝐌𝐄𝐓𝐇𝐎𝐃 : Initially, the parser has 𝑆₀ on its stack, where 𝑆₀
+    // is the intial state, and 𝑤$ in the input buffer.The parser then
+    // executes the following program
+    // ------program------
+    // let 𝑎 be the first symbol of 𝑤$;
+    // while (1) {
+    //      let 𝑠 be the state on top of the stack;
+    //      if ( 𝐴𝐶𝑇𝐼𝑂𝑁[𝑠,𝑎] = shift 𝑡 ) {
+    //          push 𝑡 onto the stack;
+    //          let 𝑎 be the next input symbol'
+    //      } else if ( 𝐴𝐶𝑇𝐼𝑂𝑁[𝑠,𝑎] = reduce 𝐴 → 𝛽) {
+    //          pop |𝛽| symbols off the stack;
+    //          let state 𝑡 now be on top of the stack;
+    //          push 𝐺𝑂𝑇𝑂[𝑡,𝑎] on to the stack;
+    //      } else if (  𝐴𝐶𝑇𝐼𝑂𝑁[𝑠,𝑎] = accecpt ) {
+    //          break
+    //      } else {
+    //          call error-recovery routine;
+    //      }
+    // }
+    pub fn parse(
+        &mut self,
+        tokens_input: Vec<Token>,
+        errors: &mut Vec<ParseError<Token>>,
+        ast: &mut AST,
+    ) {
+        let mut stack: Vec<&State<AST, Token, TranslatorStack>> = vec![];
+        let mut input_iter = tokens_input.iter();
+        let mut current_input = if let Some(input) = input_iter.next() {
+            input
+        } else {
+            exit(1)
+        };
+        let mut previous_input = current_input;
+        let mut current_input_symbol = Symbol::TERMINAL(current_input.to_string());
+        let mut S0 = self.LR1_automata.first().unwrap();
+        let mut translator_stack: Vec<TranslatorStack> = Vec::new();
+        let mut input_token_stack: Vec<Token> = Vec::new();
+
+        stack.push(S0);
+        loop {
+            S0 = stack.last().unwrap();
+            //every state will be in action_map so unwrap
+            let action_map = self.action.get(S0).unwrap();
+            if let Some(action) = action_map.get(&current_input_symbol) {
+                match action {
+                    Action::SHIFT(state) => {
+                        stack.push(state);
+
+                        //To maintain current input as a stack helps library user;
+                        input_token_stack.push(current_input.clone());
+
+                        previous_input = current_input;
+                        current_input = input_iter.next().unwrap();
+                        current_input_symbol = Symbol::TERMINAL(current_input.to_string());
+                    }
+                    Action::REDUCE(production) => {
+                        match &production.action {
+                            Some(action) => (action.as_ref())(
+                                ast,
+                                &mut input_token_stack,
+                                &mut translator_stack,
+                                errors,
+                            ),
+                            None => {}
+                        };
+                        stack.truncate(stack.len() - production.body_len());
+                        let stack_top = stack.last().unwrap();
+                        let goto_map = self.goto.get(stack_top).unwrap();
+                        let goto_stack =
+                            goto_map.get(&Symbol::NONTERMINAL(production.head.to_string()));
+                        if let Some(goto_stack) = goto_stack {
+                            stack.push(goto_stack);
+                        }
+                    }
+                    Action::ACCEPT => {
+                        break;
+                    }
+                    _ => {}
+                }
+            } else {
+                let mut input_symbol_skip_count = 0;
+                let error_token = current_input;
+                //error recovery
+                //implement second method in this paper https://ieeexplore.ieee.org/document/6643853
+                //@todo need to optimise
+                let mut error_message = self.counstruct_syntax_error_message(S0);
+
+                let deduced_items = S0.transition_productions.clone();
+                let mut deduced_production: Option<Production<AST, Token, TranslatorStack>> = None;
+                loop {
+                    stack.pop();
+                    S0 = stack.last().unwrap();
+                    let goto_map = self.goto.get(S0).unwrap();
+                    let keys: Vec<Symbol> = goto_map.clone().into_keys().collect();
+                    let mut contains = false;
+                    for item in deduced_items.iter() {
+                        if keys.contains(&Symbol::NONTERMINAL(item.production.head.clone())) {
+                            contains = true;
+                            deduced_production = Some(item.production.clone());
+                            break;
+                        }
+                    }
+                    if contains {
+                        break;
+                    }
+                }
+                //skip input till input character contains in followset of ...
+                //top_state transition symbol
+                let error_production_follow_set = self
+                    .follow_set
+                    .get(&Symbol::NONTERMINAL(
+                        deduced_production.clone().unwrap().head,
+                    ))
+                    .unwrap();
+                loop {
+                    if error_production_follow_set.contains(&current_input_symbol.to_string()) {
+                        if deduced_production.clone().unwrap().error_message.is_some() {
+                            error_message =
+                                deduced_production.unwrap().error_message.unwrap().clone();
+                        }
+                        if input_symbol_skip_count == 0 {
+                            errors.push(ParseError {
+                                token: previous_input.clone(),
+                                message: error_message,
+                                production_end: true,
+                            });
+                        } else {
+                            errors.push(ParseError {
+                                token: error_token.clone(),
+                                message: error_message,
+                                production_end: false,
+                            });
+                        }
+                        break;
+                    } else {
+                        input_symbol_skip_count += 1;
+                        previous_input = current_input;
+                        current_input = input_iter.next().unwrap();
+                        current_input_symbol = Symbol::TERMINAL(current_input.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    fn counstruct_syntax_error_message(
+        &self,
+        state: &State<AST, Token, TranslatorStack>,
+    ) -> String {
+        let action_map = self.action.get(state).unwrap();
+        let keys: Vec<Symbol> = action_map.clone().into_keys().collect();
+        let action_keys: Vec<String> = keys.iter().map(|symbol| symbol.to_string()).collect();
+        String::from("Expected ") + join_either_or(action_keys).as_str()
+    }
+}
+
+fn join_either_or(items: Vec<String>) -> String {
+    match items.len() {
+        0 => "".to_string(),
+        1 => items[0].clone(),
+        2 => format!("{} or {}", items[0], items[1]),
+        _ => {
+            let all_but_last = &items[..items.len() - 1];
+            let last = &items[items.len() - 1];
+            format!("{} or {}", all_but_last.join(", "), last)
+        }
     }
 }
