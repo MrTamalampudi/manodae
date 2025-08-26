@@ -20,7 +20,7 @@ fn E1() {
 
     let mut errors: Vec<ParseError<Token>> = Vec::new();
     let mut ast = AST::new();
-    let tokens: Vec<Token> = vec![Token::A, Token::EOF];
+    let tokens: Vec<Token> = vec![Token::D, Token::D, Token::EOF];
     parser.parse(tokens, &mut errors, &mut ast);
     assert!(true)
 }

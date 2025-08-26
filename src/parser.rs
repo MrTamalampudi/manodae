@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
-    process::{exit, ExitCode},
+    process::exit,
 };
 
 use indexmap::IndexMap;
@@ -21,7 +21,7 @@ use crate::{
 const AUGMENTED_PRODUCTION_HEAD: &'static str = "S'";
 
 #[derive(Debug, Clone)]
-pub struct LR1_Parser<'a, 'b, AST, Token, TranslatorStack> {
+pub struct LR1_Parser<'a, AST, Token, TranslatorStack> {
     pub productions: &'a Vec<Production<AST, Token, TranslatorStack>>,
     pub LR1_automata: Vec<State<'a, AST, Token, TranslatorStack>>,
     pub symbols: HashSet<Symbol>, //every gramar symbol that exists in grammar
@@ -29,16 +29,16 @@ pub struct LR1_Parser<'a, 'b, AST, Token, TranslatorStack> {
     pub first_set: HashMap<Symbol, HashSet<String>>,
     pub conflicts: bool,
     pub goto: IndexMap<
-        &'b State<'a, AST, Token, TranslatorStack>,
-        IndexMap<Symbol, &'b State<'a, AST, Token, TranslatorStack>>,
+        State<'a, AST, Token, TranslatorStack>,
+        IndexMap<Symbol, State<'a, AST, Token, TranslatorStack>>,
     >,
     pub action: IndexMap<
-        &'b State<'a, AST, Token, TranslatorStack>,
-        IndexMap<Symbol, Action<'a, 'b, AST, Token, TranslatorStack>>,
+        State<'a, AST, Token, TranslatorStack>,
+        IndexMap<Symbol, Action<'a, AST, Token, TranslatorStack>>,
     >,
 }
 
-impl<'a, 'b, AST, Token, TranslatorStack> LR1_Parser<'a, 'b, AST, Token, TranslatorStack>
+impl<'a, AST, Token, TranslatorStack> LR1_Parser<'a, AST, Token, TranslatorStack>
 where
     AST: Clone + Debug + PartialEq,
     Token: ToString + Debug + Clone + PartialEq,
@@ -53,7 +53,7 @@ where
         let first_set = compute_first_set(&productions);
         let follow_set = compute_follow_set(&productions);
 
-        LR1_Parser {
+        let mut a = LR1_Parser {
             productions: productions,
             LR1_automata: Vec::new(),
             symbols,
@@ -62,7 +62,9 @@ where
             conflicts: false,
             action: IndexMap::new(),
             goto: IndexMap::new(),
-        }
+        };
+        a.construct_LALR_Table();
+        a.clone()
     }
 
     // Algorithm
@@ -229,18 +231,18 @@ where
     //  6. All entries not defined by rules (4) and (5) are made "error".
     //  7. Then intitial state of the parser is the one constructed from the set
     //     of items containing [𝑆' → .𝑆,$]
-    pub fn construct_LALR_Table(&'b mut self) {
+    pub fn construct_LALR_Table(&mut self) {
         self.items();
         self.LR1_automata.merge_sets();
 
         let mut action: IndexMap<
-            &State<AST, Token, TranslatorStack>,
+            State<AST, Token, TranslatorStack>,
             IndexMap<Symbol, Action<AST, Token, TranslatorStack>>,
         > = IndexMap::new();
 
         let mut goto: IndexMap<
-            &State<AST, Token, TranslatorStack>,
-            IndexMap<Symbol, &State<AST, Token, TranslatorStack>>,
+            State<AST, Token, TranslatorStack>,
+            IndexMap<Symbol, State<AST, Token, TranslatorStack>>,
         > = IndexMap::new();
 
         let mut transition_prod_map: IndexMap<
@@ -267,9 +269,9 @@ where
                         item.lookaheads.iter().for_each(|lookahead| {
                             map.insert(lookahead.clone(), Action::REDUCE(item.production));
                         });
-                        action.entry(state).insert_entry(map);
+                        action.entry(state.clone()).insert_entry(map);
                     } else {
-                        action.entry(state).insert_entry(IndexMap::from([(
+                        action.entry(state.clone()).insert_entry(IndexMap::from([(
                             Symbol::TERMINAL(String::from("EOF")),
                             Action::ACCEPT,
                         )]));
@@ -285,23 +287,26 @@ where
                 }
                 if let Symbol::TERMINAL(_) = symbol {
                     action
-                        .entry(state)
+                        .entry(state.clone())
                         .and_modify(|map| {
-                            map.insert(symbol.clone(), Action::SHIFT(item_goto_state.unwrap()));
+                            map.insert(
+                                symbol.clone(),
+                                Action::SHIFT(item_goto_state.unwrap().clone().clone()),
+                            );
                         })
                         .or_insert(IndexMap::from([(
                             symbol.clone(),
-                            Action::SHIFT(item_goto_state.unwrap()),
+                            Action::SHIFT(item_goto_state.unwrap().clone().clone()),
                         )]));
                 }
                 if let Symbol::NONTERMINAL(_) = symbol {
-                    goto.entry(state)
+                    goto.entry(state.clone())
                         .and_modify(|map| {
-                            map.insert(symbol.clone(), *item_goto_state.unwrap());
+                            map.insert(symbol.clone(), item_goto_state.unwrap().clone().clone());
                         })
                         .or_insert(IndexMap::from([(
                             symbol.clone(),
-                            *item_goto_state.unwrap(),
+                            item_goto_state.unwrap().clone().clone(),
                         )]));
                 }
             }
@@ -362,6 +367,7 @@ where
             //every state will be in action_map so unwrap
             let action_map = self.action.get(S0).unwrap();
             if let Some(action) = action_map.get(&current_input_symbol) {
+                println!("aaaaaaaaaaaaaaaaaaa : {:#?}", action);
                 match action {
                     Action::SHIFT(state) => {
                         stack.push(state);
@@ -385,7 +391,7 @@ where
                         };
                         stack.truncate(stack.len() - production.body_len());
                         let stack_top = stack.last().unwrap();
-                        let goto_map = self.goto.get(stack_top).unwrap();
+                        let goto_map = self.goto.get(*stack_top).unwrap();
                         let goto_stack =
                             goto_map.get(&Symbol::NONTERMINAL(production.head.to_string()));
                         if let Some(goto_stack) = goto_stack {
@@ -393,6 +399,7 @@ where
                         }
                     }
                     Action::ACCEPT => {
+                        println!("heyyyyyyy");
                         break;
                     }
                     _ => {}
