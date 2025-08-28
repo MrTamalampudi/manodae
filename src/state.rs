@@ -1,6 +1,9 @@
 use std::{
+    cell::RefCell,
     fmt::Debug,
     hash::{self, Hash},
+    ops::{Deref, DerefMut},
+    rc::Rc,
 };
 
 use indexmap::IndexMap;
@@ -71,7 +74,7 @@ pub trait StateVecExtension {
 }
 
 impl<'a, AST, Token, TranslatorStack> StateVecExtension
-    for Vec<State<'a, AST, Token, TranslatorStack>>
+    for Vec<Rc<State<'a, AST, Token, TranslatorStack>>>
 where
     AST: Clone + PartialEq + Debug,
     Token: Clone + PartialEq + Debug,
@@ -79,23 +82,35 @@ where
 {
     fn merge_sets(&mut self) {
         let mut new_states: IndexMap<
-            State<'a, AST, Token, TranslatorStack>,
-            State<'a, AST, Token, TranslatorStack>,
+            Rc<State<'a, AST, Token, TranslatorStack>>,
+            Rc<RefCell<State<'a, AST, Token, TranslatorStack>>>,
         > = IndexMap::new();
         for state in self.iter() {
             let state_entry = new_states
-                .entry(state.clone())
+                .entry(Rc::new(state.deref().clone()))
                 .and_modify(|entry| {
-                    entry.items.extend(state.items.clone());
                     entry
+                        .borrow_mut()
+                        .deref_mut()
+                        .items
+                        .extend(state.items.clone());
+                    entry
+                        .borrow_mut()
                         .transition_productions
                         .extend(state.transition_productions.clone());
                 })
-                .or_insert(state.clone());
-            state_entry.items.merge_cores();
-            state_entry.transition_productions.merge_cores();
+                .or_insert(Rc::new(RefCell::new(state.deref().clone())));
+            state_entry.borrow_mut().items.merge_cores();
+            state_entry
+                .borrow_mut()
+                .transition_productions
+                .merge_cores();
         }
+        let a = new_states
+            .into_values()
+            .map(|state| Rc::new(state.borrow().deref().clone()))
+            .collect::<Vec<_>>();
         self.clear();
-        self.extend(new_states.into_values().collect::<Vec<_>>());
+        self.extend(a);
     }
 }
