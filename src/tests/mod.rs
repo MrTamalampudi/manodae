@@ -1,8 +1,10 @@
+#![allow(dead_code)]
+mod E1;
 mod basic;
-mod remove_unit_productions;
+mod left_factor;
 mod tokens;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct AST {
     pub result: bool,
 }
@@ -13,5 +15,5 @@ impl AST {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TranslatorStack {}

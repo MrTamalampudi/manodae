@@ -1,360 +1,388 @@
-use core::panic;
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::fmt::Debug;
-use std::sync::Arc;
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+    process::exit,
+    rc::Rc,
+    time::Instant,
+};
 
-use crate::action::Action;
-use crate::conflict::ConflictType;
-use crate::error::ParseError;
-use crate::first::compute_first_set;
-use crate::follow::compute_follow_set;
-use crate::production::Production;
-use crate::simplify_grammar::eliminate_unit_productions;
-use crate::simplify_grammar::eliminate_useless_productions;
-use crate::state::State;
-use crate::symbol::unique_symbols;
-use crate::symbol::Symbol;
+use indexmap::IndexMap;
 
-#[derive(Debug)]
-pub struct Parser<AST, Token, TranslatorStack> {
-    pub productions: Vec<Production<AST, Token, TranslatorStack>>,
-    pub lr0_automaton: Vec<State<AST, Token, TranslatorStack>>,
-    pub symbols: Vec<Symbol>, //every gramar symbol that exists in grammar
+use crate::{
+    action::Action,
+    error::ParseError,
+    first::compute_first_set,
+    follow::compute_follow_set,
+    item::{Item, ItemVecExtension},
+    production::Production,
+    state::{State, StateVecExtension},
+    symbol::{unique_symbols, Symbol},
+    traits::VecExtension,
+};
+
+const AUGMENTED_PRODUCTION_HEAD: &'static str = "S'";
+
+#[derive(Debug, Clone)]
+pub struct LR1_Parser<'a, AST, Token, TranslatorStack> {
+    pub productions: &'a Vec<Production<AST, Token, TranslatorStack>>,
+    pub LR1_automata: Vec<Rc<State<'a, AST, Token, TranslatorStack>>>,
+    pub symbols: HashSet<Symbol>, //every gramar symbol that exists in grammar
     pub follow_set: HashMap<Symbol, HashSet<String>>,
     pub first_set: HashMap<Symbol, HashSet<String>>,
     pub conflicts: bool,
+    pub goto: IndexMap<
+        Rc<State<'a, AST, Token, TranslatorStack>>,
+        IndexMap<Symbol, Rc<State<'a, AST, Token, TranslatorStack>>>,
+    >,
+    pub action: IndexMap<
+        Rc<State<'a, AST, Token, TranslatorStack>>,
+        IndexMap<Symbol, Action<'a, AST, Token, TranslatorStack>>,
+    >,
 }
 
-impl<AST, Token, TranslatorStack> Parser<AST, Token, TranslatorStack>
+impl<'a, AST, Token, TranslatorStack> LR1_Parser<'a, AST, Token, TranslatorStack>
 where
-    AST: Clone + Debug,
-    Token: ToString + Debug + Clone,
-    TranslatorStack: Clone + Debug,
+    AST: Clone + Debug + PartialEq,
+    Token: ToString + Debug + Clone + PartialEq,
+    TranslatorStack: Clone + Debug + PartialEq,
 {
     pub fn new(
         productions: &Vec<Production<AST, Token, TranslatorStack>>,
-    ) -> Parser<AST, Token, TranslatorStack> {
-        let mut productions_ = eliminate_unit_productions(productions);
-        productions_ = eliminate_useless_productions(productions_);
-
-        //populate index numbers of productions
-        productions_
-            .iter_mut()
-            .enumerate()
-            .for_each(|(index, production)| production.index = index + 1);
-
-        //creating augmented production
-        let augmented_production: Production<AST, Token, TranslatorStack> = Production {
-            head: String::from("S'"),
-            body: vec![Symbol::NONTERMINAL(String::from("Start"))],
-            cursor_pos: 0,
-            index: 0,
-            error_message: None,
-
-            #[allow(unused_variables)]
-            action: Some(Arc::new(|ast, token_stack, tl_stack, errors| {})),
-        };
-
-        productions_.insert(0, augmented_production);
-
+    ) -> LR1_Parser<AST, Token, TranslatorStack> {
         //collect all grammar symbols without duplicates
-        let symbols: Vec<Symbol> = unique_symbols(&productions_);
+        let symbols: HashSet<Symbol> = unique_symbols(&productions);
 
-        let first_set = compute_first_set(&productions_);
-        let follow_set = compute_follow_set(&productions_);
+        let first_set = compute_first_set(&productions);
+        let follow_set = compute_follow_set(&productions);
 
-        Parser {
-            productions: productions_,
-            lr0_automaton: Vec::new(),
+        let mut a = LR1_Parser {
+            productions: productions,
+            LR1_automata: Vec::new(),
             symbols,
             first_set,
             follow_set,
             conflicts: false,
-        }
+            action: IndexMap::new(),
+            goto: IndexMap::new(),
+        };
+        a.construct_LALR_Table();
+        a
     }
 
-    pub fn closure(&self, productions: &mut Vec<Production<AST, Token, TranslatorStack>>) {
-        let mut symbols: Vec<String> = vec![];
-        loop {
-            let productions_ = productions.clone();
-            for production in productions_.iter() {
-                let symbol = match production.next_symbol() {
-                    Some(symbol) => match symbol {
-                        Symbol::NONTERMINAL(head) => head,
-                        _ => continue,
-                    },
-                    None => continue,
-                };
-
-                //this is for not to add already added productions
-                //removing this block causes infinite loop
-                if symbols.contains(&symbol) {
-                    continue;
+    // Algorithm
+    // void 𝐶𝐿𝑂𝑆𝑈𝑅𝐸(𝐼:items) {
+    //   repeat
+    //       for (each item [𝐴 → 𝛼.𝐵𝛽,𝑎] in 𝐼 )
+    //           for ( each production [𝐵 → 𝛾] in 𝐺' )
+    //               for ( each terminal 𝑏 in FIRST(𝛽𝑎) )
+    //                   add [𝐵 → .𝛾,𝑏] to set 𝐼
+    //   until no more items are added to 𝐼
+    // }
+    fn clousure(&self, items: &mut Vec<Item<'a, AST, Token, TranslatorStack>>) {
+        let mut items_count = 0;
+        let mut items_iterated_count = 0;
+        while items.len().ne(&items_count) {
+            items_count = items.len();
+            let mut new_items = Vec::new();
+            for items_index in items_iterated_count..items.len() {
+                let item = items.get(items_index).unwrap();
+                let B = item.next_symbol();
+                let beta = item.production.body.get((item.cursor + 1) as usize);
+                let first_of = if let Some(beta) = beta {
+                    vec![beta.clone()]
                 } else {
-                    symbols.push(symbol.clone());
+                    item.lookaheads.clone()
+                };
+                if let None = B {
+                    continue;
                 }
-
-                let matched_head_productions: Vec<Production<AST, Token, TranslatorStack>> = self
+                let production_B = B.unwrap();
+                if production_B.is_terminal() {
+                    continue;
+                }
+                let b_productions: Vec<_> = self
                     .productions
                     .iter()
-                    .cloned()
-                    .filter(|production| production.head.eq(symbol))
+                    .filter(|production| production.head.eq(&production_B.to_string()))
                     .collect();
-
-                productions.extend(matched_head_productions);
+                for b_production in b_productions.iter() {
+                    let mut lookaheads = Vec::new();
+                    for first in first_of.iter() {
+                        for terminal_b in self.first_set.get(first).unwrap().iter() {
+                            lookaheads.push(Symbol::TERMINAL(terminal_b.to_string()));
+                        }
+                    }
+                    let p = *b_production;
+                    let item_ = Item {
+                        production: p,
+                        cursor: 0,
+                        lookaheads: lookaheads,
+                    };
+                    if items.custom_contains(&item_) || new_items.custom_contains(&item_) {
+                        continue;
+                    }
+                    new_items.push(item_);
+                }
+                items_iterated_count += 1;
             }
-
-            if productions.len() == productions_.len() {
-                break;
-            }
+            items.extend(new_items);
         }
+        items.merge_cores();
     }
 
-    //GOTO(Item,Symbol) is defined to be the closure of the set of
-    //all items [A -> aX.B] such that [A -> a.XB] is in I {ref:ullman dragon book}
-    pub fn goto(
+    // Algorithm
+    // State 𝐺𝑂𝑇𝑂(𝐼:items, 𝑋:symbol) {
+    //   initialize 𝐽 to be the empty set;
+    //   for ( each item [𝐴 → 𝛼.𝑋𝛽,𝑎] in 𝐼)
+    //       add item [𝐴 → 𝛼𝑋.𝛽,𝑎] to set 𝐽;
+    //   return 𝐶𝐿𝑂𝑆𝑈𝑅𝐸(𝐽);
+    // }
+    fn goto(
         &self,
-        productions: &Vec<Production<AST, Token, TranslatorStack>>,
+        items: &Vec<Item<'a, AST, Token, TranslatorStack>>,
         symbol: &Symbol,
-    ) -> State<AST, Token, TranslatorStack> {
-        let mut goto_productions: Vec<Production<AST, Token, TranslatorStack>> = productions
-            .iter()
-            .filter(|production| match production.next_symbol() {
-                Some(symbol_) => symbol.eq(symbol_),
-                None => false,
-            })
-            .map(|production| {
-                let mut temp = production.clone();
-                temp.advance_cursor();
-                temp
-            })
-            .collect();
-        let transition_productions = goto_productions.clone();
-        self.closure(&mut goto_productions);
-        State {
-            state: 0, //Dont forget to update this according to the index in canonical collection
-            productions: goto_productions,
-            transition_symbol: symbol.clone(),
-            transition_productions: transition_productions,
-            action: HashMap::new(),
-            goto: HashMap::new(),
-            conflicts: HashMap::new(),
+    ) -> State<'a, AST, Token, TranslatorStack> {
+        let mut new_items = vec![];
+        for mut item in items.iter().cloned() {
+            let item_symbol = item.next_symbol();
+            if item_symbol.is_none() {
+                continue;
+            }
+            if symbol != item_symbol.unwrap() {
+                continue;
+            }
+            item.advance_cursor();
+            new_items.push(item);
         }
+        let transition_productions = new_items.clone();
+        let mut state = State::new(0, new_items.clone(), transition_productions);
+        self.clousure(&mut new_items);
+        state.items = new_items;
+        state
     }
 
-    pub fn compute_lr0_items(&mut self) {
-        let augmented_grammar = self.productions.first().unwrap();
-        let mut state1 = vec![augmented_grammar.clone()];
-        self.closure(&mut state1);
-        let initial_state = State {
-            state: 0,
-            productions: state1,
-            transition_symbol: Symbol::NONE,
-            transition_productions: vec![augmented_grammar.clone()],
-            action: HashMap::new(),
-            goto: HashMap::new(),
-            conflicts: HashMap::new(),
+    // Algorithm
+    // void 𝐼𝑇𝐸𝑀𝑆(𝐺') {
+    //   initialize 𝐶 to { 𝐶𝐿𝑂𝑆𝑈𝑅𝐸({[𝑆' → .𝑆,$]}) };
+    //   repeat
+    //       for ( each set of items 𝐼 in 𝐶 )
+    //           for ( each grammar symbol 𝑋 )
+    //               if ( 𝐺𝑂𝑇𝑂(𝐼, 𝑋) is not empty and not in 𝐶 )
+    //                   add 𝐺𝑂𝑇𝑂(𝐼, 𝑋) to 𝐶;
+    //   until no new sets of items are added to 𝐶;
+    // }
+    fn items(&mut self) {
+        let augmented_item: Item<AST, Token, TranslatorStack> = Item {
+            production: self.productions.first().unwrap(),
+            cursor: 0,
+            lookaheads: vec![Symbol::TERMINAL(String::from("EOF"))],
         };
-        let mut canonical_collection: Vec<State<AST, Token, TranslatorStack>> = vec![initial_state];
-        loop {
-            //this clone is for because we cant update the vector which is already in use
-            let canonical_clone = canonical_collection.clone();
-            //this loop is uneccesary it can be optimised
-            for state_clone in canonical_clone.iter() {
-                let (reduce_productions, shift_productions) =
-                    compute_shift_reduce_productions(&state_clone.productions);
+        let mut S0_items = vec![augmented_item];
+        self.clousure(&mut S0_items);
+        let mut LR1_automata = vec![State {
+            transition_productions: vec![],
+            index: 0,
+            items: S0_items,
+        }];
+        let mut states_count = 0;
+        let mut states_iterated_count = 0;
+        while LR1_automata.len().ne(&states_count) {
+            states_count = LR1_automata.len();
+            let mut new_state = vec![];
+            for states_index in states_iterated_count..LR1_automata.len() {
+                let state = LR1_automata.get(states_index).unwrap();
                 for symbol in self.symbols.iter() {
-                    if let Symbol::TERMINAL(terminal) = symbol {
-                        for production in reduce_productions.iter() {
-                            let state = canonical_collection.get_mut(state_clone.state).expect("");
-                            //eofff
-                            if production.is_augment_production()
-                                && terminal.eq(&String::from("EOF"))
-                            {
-                                if let Some(action) = state.action.get("EOF") {
-                                    if !matches!(action, Action::ACCEPT) {
-                                        self.conflicts = true;
-                                        state.conflicts.insert(
-                                            String::from("EOF"),
-                                            ConflictType::RR([action.clone(), Action::ACCEPT]),
-                                        );
-                                    }
-                                } else {
-                                    state.action.insert(String::from("EOF"), Action::ACCEPT);
-                                }
-                            }
-                            if production.is_augment_production() {
-                                continue;
-                            }
-
-                            let set = self
-                                .follow_set
-                                .get(&Symbol::NONTERMINAL(production.head.clone()))
-                                .expect(format!("{}", production.head.clone()).as_str());
-
-                            let follow_set_contains = match symbol {
-                                Symbol::TERMINAL(terminal) => set.contains(terminal),
-                                _ => false,
-                            };
-
-                            if follow_set_contains {
-                                if let Symbol::TERMINAL(terminal) = symbol {
-                                    match state.action.get(terminal) {
-                                        Some(entry) => match entry {
-                                            Action::REDUCE(index) if index != &production.index => {
-                                                self.conflicts = true;
-                                                state.conflicts.insert(
-                                                    terminal.clone(),
-                                                    ConflictType::SR([
-                                                        entry.clone(),
-                                                        Action::REDUCE(production.index),
-                                                    ]),
-                                                );
-                                            }
-                                            Action::REDUCE(_) => {}
-                                            _ => {
-                                                panic!("conflict")
-                                            }
-                                        },
-                                        None => {
-                                            state.action.insert(
-                                                terminal.clone(),
-                                                Action::REDUCE(production.index),
-                                            );
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    //shift and goto
-                    let mut goto = self.goto(&shift_productions, symbol);
-                    let (is_item_in_collection, state__) = is_items_in_canonical_collection(
-                        canonical_collection.clone(),
-                        &goto.productions,
-                    );
-                    if !goto.productions.is_empty() && is_item_in_collection {
-                        let goto_state = state__.unwrap();
-                        let state = canonical_collection.get_mut(state_clone.state).expect("");
-                        match symbol {
-                            Symbol::TERMINAL(terminal) => {
-                                if let Some(entry) = state.action.get(terminal) {
-                                    match entry {
-                                        Action::SHIFT(state_index)
-                                            if state_index != &goto_state.state =>
-                                        {
-                                            panic!("conflict")
-                                        }
-                                        Action::SHIFT(_) => {}
-                                        Action::REDUCE(_) => {
-                                            self.conflicts = true;
-                                            state.conflicts.insert(
-                                                terminal.clone(),
-                                                ConflictType::SR([
-                                                    entry.clone(),
-                                                    Action::SHIFT(goto_state.state),
-                                                ]),
-                                            );
-                                        }
-                                        _ => {
-                                            panic!("conflict")
-                                        }
-                                    }
-                                }
-                                state
-                                    .action
-                                    .insert(terminal.clone(), Action::SHIFT(goto_state.state));
-                            }
-                            Symbol::NONTERMINAL(non_terminal) => {
-                                state.goto.insert(non_terminal.clone(), goto_state.state);
-                            }
-                            Symbol::NONE => {}
-                        }
-                    }
-                    if !goto.productions.is_empty() && !is_item_in_collection {
-                        goto.state = canonical_collection.len();
-                        canonical_collection.push(goto.clone());
-                        let state = canonical_collection.get_mut(state_clone.state).expect("");
-                        match symbol {
-                            Symbol::TERMINAL(terminal) => {
-                                if let Some(entry) = state.action.get(terminal) {
-                                    match entry {
-                                        Action::SHIFT(state_index)
-                                            if state_index != &goto.state =>
-                                        {
-                                            self.conflicts = true;
-                                        }
-                                        Action::SHIFT(_) => {}
-                                        Action::REDUCE(_) => {
-                                            self.conflicts = true;
-                                            state.conflicts.insert(
-                                                terminal.clone(),
-                                                ConflictType::SR([
-                                                    entry.clone(),
-                                                    Action::SHIFT(goto.state),
-                                                ]),
-                                            );
-                                        }
-                                        _ => {
-                                            panic!("conflict")
-                                        }
-                                    }
-                                }
-                                state
-                                    .action
-                                    .insert(terminal.clone(), Action::SHIFT(goto.state));
-                            }
-                            Symbol::NONTERMINAL(non_terminal) => {
-                                state.goto.insert(non_terminal.clone(), goto.state);
-                            }
-                            Symbol::NONE => {}
-                        }
+                    let goto_productions_state = self.goto(&state.items, symbol);
+                    if !goto_productions_state.items.is_empty()
+                        && !LR1_automata.custom_contains(&goto_productions_state)
+                    {
+                        new_state.push(goto_productions_state);
                     }
                 }
+                states_iterated_count += 1;
             }
-            if canonical_clone.len() == canonical_collection.len() {
-                break;
-            }
+            LR1_automata.extend(new_state);
         }
-        self.lr0_automaton = canonical_collection;
+        LR1_automata
+            .iter_mut()
+            .enumerate()
+            .for_each(|(index, state)| state.index = index);
+
+        self.LR1_automata = LR1_automata
+            .iter()
+            .map(|state| Rc::new(state.clone()))
+            .collect();
     }
 
+    // Algorithm
+    // 𝐈𝐍𝐏𝐔𝐓 : An augmented grammar 𝐺'
+    // 𝐎𝐔𝐓𝐏𝐔𝐓 : The 𝐿𝐴𝐿𝑅 parsing-table functions 𝐴𝐶𝑇𝐼𝑂𝑁 and 𝐺𝑂𝑇𝑂 for 𝐺'
+    // 𝐌𝐄𝐓𝐇𝐎𝐃 :
+    //  1. Construct 𝐶 = {𝐼₀,𝐼₁,...,𝐼ₙ}, the collection of sets of 𝐿𝑅(1) items
+    //  2. For each core present among the set of 𝐿𝑅(1) items, find all sets
+    //     having that core, and replace these sets by their union.
+    //  3. Let 𝐶' = {𝐽₀,𝐽₁,...,𝐽ₙ} be the resulting sets of 𝐿𝑅(1) items.
+    //  4. State 𝑖 of the parser is constructed from 𝐽ᵢ. The parsing action for
+    //     state 𝑖 us determined as follows
+    //     (a) If [𝐴 → 𝛼.𝑎𝛽,𝑏] is in 𝐽ᵢ and 𝐺𝑂𝑇𝑂(𝐽ᵢ,𝑎) = 𝐽ₖ, then set 𝐴𝐶𝑇𝐼𝑂𝑁[𝑖,𝑎]
+    //         to "shift 𝑘". Here 𝑎 must be a terminal.
+    //     (b) If [𝐴 → 𝛼.,𝑎] is in 𝐽ᵢ, 𝐴 ≠ 𝑆', then set 𝐴𝐶𝑇𝐼𝑂𝑁[𝑖,𝑎] to
+    //         "reduce 𝐴 → 𝛼".
+    //     (c) If [𝑆' → 𝑆.,$] is in 𝐽ᵢ, the set then set 𝐴𝐶𝑇𝐼𝑂𝑁[𝑖,𝑎] to "accept".
+    //     If any conflicting actions result from above rules, we say the
+    //     grammar is not 𝐿𝐴𝐿𝑅(1). The algorithm fails to produce a parser in this
+    //     case.
+    //  5. The goto transitions for state 𝑖 are constructed for all nonterminals
+    //     𝐴 using the rule: If 𝐺𝑂𝑇𝑂(𝐽ᵢ,𝐴) = 𝐽ₖ, then 𝐺𝑂𝑇𝑂[𝑖,𝐴] = 𝑘.
+    //  6. All entries not defined by rules (4) and (5) are made "error".
+    //  7. Then intitial state of the parser is the one constructed from the set
+    //     of items containing [𝑆' → .𝑆,$]
+    pub fn construct_LALR_Table(&mut self) {
+        self.items();
+        self.LR1_automata.merge_sets();
+
+        let mut action: IndexMap<
+            Rc<State<'a, AST, Token, TranslatorStack>>,
+            IndexMap<Symbol, Action<AST, Token, TranslatorStack>>,
+        > = IndexMap::new();
+
+        let mut goto: IndexMap<
+            Rc<State<'a, AST, Token, TranslatorStack>>,
+            IndexMap<Symbol, Rc<State<'a, AST, Token, TranslatorStack>>>,
+        > = IndexMap::new();
+
+        let mut transition_prod_map: IndexMap<
+            Item<AST, Token, TranslatorStack>,
+            &Rc<State<AST, Token, TranslatorStack>>,
+        > = IndexMap::new();
+
+        self.LR1_automata.iter().for_each(|state| {
+            for item in state.transition_productions.iter() {
+                transition_prod_map.entry(item.clone()).or_insert(state);
+            }
+        });
+
+        for state in self.LR1_automata.iter() {
+            for item in state.items.iter() {
+                let next_symbol = item.next_symbol();
+                if next_symbol.is_none() {
+                    if item
+                        .production
+                        .head
+                        .ne(&AUGMENTED_PRODUCTION_HEAD.to_string())
+                    {
+                        let mut map = IndexMap::new();
+                        item.lookaheads.iter().for_each(|lookahead| {
+                            map.insert(lookahead.clone(), Action::REDUCE(item.production));
+                        });
+                        action.entry(state.clone()).insert_entry(map);
+                    } else {
+                        action.entry(state.clone()).insert_entry(IndexMap::from([(
+                            Symbol::TERMINAL(String::from("EOF")),
+                            Action::ACCEPT,
+                        )]));
+                    }
+                    continue;
+                }
+                let symbol = next_symbol.unwrap();
+                let mut item_ = item.clone();
+                item_.advance_cursor();
+                let item_goto_state = transition_prod_map.get(&item_);
+                if item_goto_state.is_none() {
+                    continue;
+                }
+                let item_goto_state = item_goto_state.unwrap();
+                if let Symbol::TERMINAL(_) = symbol {
+                    action
+                        .entry(state.clone())
+                        .and_modify(|map| {
+                            map.insert(symbol.clone(), Action::SHIFT(Rc::clone(item_goto_state)));
+                        })
+                        .or_insert(IndexMap::from([(
+                            symbol.clone(),
+                            Action::SHIFT(Rc::clone(item_goto_state)),
+                        )]));
+                }
+                if let Symbol::NONTERMINAL(_) = symbol {
+                    goto.entry(state.clone())
+                        .and_modify(|map| {
+                            map.insert(symbol.clone(), Rc::clone(item_goto_state));
+                        })
+                        .or_insert(IndexMap::from([(
+                            symbol.clone(),
+                            Rc::clone(item_goto_state),
+                        )]));
+                }
+            }
+        }
+        self.action = action;
+        self.goto = goto;
+    }
+
+    //LR-Parsing Algorithm
+    // 𝐈𝐍𝐏𝐔𝐓 : An input string 𝑤 and LR-parsing table with functions
+    // 𝐴𝐶𝑇𝐼𝑂𝑁 and 𝐺𝑂𝑇𝑂 for a grammar 𝐺
+    //
+    // 𝐎𝐔𝐓𝐏𝐔𝐓 : If 𝑤 is not in 𝐿(𝐺), an error result
+    //
+    // 𝐌𝐄𝐓𝐇𝐎𝐃 : Initially, the parser has 𝑆₀ on its stack, where 𝑆₀
+    // is the intial state, and 𝑤$ in the input buffer.The parser then
+    // executes the following program
+    // ------program------
+    // let 𝑎 be the first symbol of 𝑤$;
+    // while (1) {
+    //      let 𝑠 be the state on top of the stack;
+    //      if ( 𝐴𝐶𝑇𝐼𝑂𝑁[𝑠,𝑎] = shift 𝑡 ) {
+    //          push 𝑡 onto the stack;
+    //          let 𝑎 be the next input symbol'
+    //      } else if ( 𝐴𝐶𝑇𝐼𝑂𝑁[𝑠,𝑎] = reduce 𝐴 → 𝛽) {
+    //          pop |𝛽| symbols off the stack;
+    //          let state 𝑡 now be on top of the stack;
+    //          push 𝐺𝑂𝑇𝑂[𝑡,𝑎] on to the stack;
+    //      } else if (  𝐴𝐶𝑇𝐼𝑂𝑁[𝑠,𝑎] = accecpt ) {
+    //          break
+    //      } else {
+    //          call error-recovery routine;
+    //      }
+    // }
     pub fn parse(
-        &self,
+        &mut self,
         tokens_input: Vec<Token>,
         errors: &mut Vec<ParseError<Token>>,
         ast: &mut AST,
     ) {
-        let mut stack: Vec<State<AST, Token, TranslatorStack>> = Vec::new();
+        let mut stack: Vec<Rc<State<AST, Token, TranslatorStack>>> = vec![];
         let mut input_iter = tokens_input.iter();
-        let mut current_input = input_iter.next().unwrap();
+        let mut current_input = if let Some(input) = input_iter.next() {
+            input
+        } else {
+            exit(1)
+        };
         let mut previous_input = current_input;
-        let mut current_input_string = current_input.to_string();
-        let mut top_state = self.lr0_automaton.first().unwrap();
+        let mut current_input_symbol = Symbol::TERMINAL(current_input.to_string());
+        let mut S0 = self.LR1_automata.first().unwrap();
         let mut translator_stack: Vec<TranslatorStack> = Vec::new();
         let mut input_token_stack: Vec<Token> = Vec::new();
 
-        stack.push(top_state.clone());
+        stack.push(Rc::clone(S0));
         loop {
-            top_state = stack.last().unwrap();
-
-            if top_state.action.contains_key(&current_input_string) {
-                match top_state.action.get(&current_input_string).unwrap() {
+            S0 = stack.last().unwrap();
+            //every state will be in action_map so unwrap
+            let action_map = self.action.get(S0).unwrap();
+            if let Some(action) = action_map.get(&current_input_symbol) {
+                match action {
                     Action::SHIFT(state) => {
-                        stack.push(self.lr0_automaton.get(state.clone()).unwrap().clone());
+                        stack.push(Rc::clone(state));
 
                         //To maintain current input as a stack helps library user;
                         input_token_stack.push(current_input.clone());
 
                         previous_input = current_input;
                         current_input = input_iter.next().unwrap();
-                        current_input_string = current_input.to_string();
+                        current_input_symbol = Symbol::TERMINAL(current_input.to_string());
                     }
                     Action::REDUCE(production) => {
-                        let production_ = self.productions.get(production.clone()).unwrap();
-                        match &production_.action {
+                        match &production.action {
                             Some(action) => (action.as_ref())(
                                 ast,
                                 &mut input_token_stack,
@@ -363,15 +391,17 @@ where
                             ),
                             None => {}
                         };
-                        let pop_len = production_.body.len();
-                        for _ in 0..pop_len {
-                            stack.pop();
-                        }
+                        stack.truncate(stack.len() - production.body_len());
                         let stack_top = stack.last().unwrap();
-                        let goto_state = stack_top.goto.get(&production_.head).unwrap();
-                        stack.push(self.lr0_automaton.get(goto_state.clone()).unwrap().clone());
+                        let goto_map = self.goto.get(stack_top).unwrap();
+                        let goto_stack =
+                            goto_map.get(&Symbol::NONTERMINAL(production.head.to_string()));
+                        if let Some(goto_stack) = goto_stack {
+                            stack.push(Rc::clone(goto_stack));
+                        }
                     }
                     Action::ACCEPT => {
+                        println!("heyyyyyyy");
                         break;
                     }
                     _ => {}
@@ -381,19 +411,21 @@ where
                 let error_token = current_input;
                 //error recovery
                 //implement second method in this paper https://ieeexplore.ieee.org/document/6643853
+                //@todo need to optimise
+                let mut error_message = self.counstruct_syntax_error_message(S0);
 
-                let mut error_message = counstruct_syntax_error_message(top_state);
-
-                let deduced_productions = top_state.transition_productions.clone();
+                let deduced_items = S0.transition_productions.clone();
                 let mut deduced_production: Option<Production<AST, Token, TranslatorStack>> = None;
                 loop {
                     stack.pop();
-                    top_state = stack.last().unwrap();
+                    S0 = stack.last().unwrap();
+                    let goto_map = self.goto.get(S0).unwrap();
+                    let keys: Vec<Symbol> = goto_map.clone().into_keys().collect();
                     let mut contains = false;
-                    for production in deduced_productions.iter() {
-                        if top_state.goto.contains_key(&production.head) {
+                    for item in deduced_items.iter() {
+                        if keys.contains(&Symbol::NONTERMINAL(item.production.head.clone())) {
                             contains = true;
-                            deduced_production = Some(production.clone());
+                            deduced_production = Some(item.production.clone());
                             break;
                         }
                     }
@@ -410,7 +442,7 @@ where
                     ))
                     .unwrap();
                 loop {
-                    if error_production_follow_set.contains(&current_input_string) {
+                    if error_production_follow_set.contains(&current_input_symbol.to_string()) {
                         if deduced_production.clone().unwrap().error_message.is_some() {
                             error_message =
                                 deduced_production.unwrap().error_message.unwrap().clone();
@@ -433,19 +465,22 @@ where
                         input_symbol_skip_count += 1;
                         previous_input = current_input;
                         current_input = input_iter.next().unwrap();
-                        current_input_string = current_input.to_string();
+                        current_input_symbol = Symbol::TERMINAL(current_input.to_string());
                     }
                 }
             }
         }
     }
-}
 
-fn counstruct_syntax_error_message<AST, Token, TranslatorStack>(
-    state: &State<AST, Token, TranslatorStack>,
-) -> String {
-    let action_keys: Vec<String> = state.action.keys().cloned().collect();
-    String::from("Expected ") + join_either_or(action_keys).as_str()
+    fn counstruct_syntax_error_message(
+        &self,
+        state: &State<AST, Token, TranslatorStack>,
+    ) -> String {
+        let action_map = self.action.get(state).unwrap();
+        let keys: Vec<Symbol> = action_map.clone().into_keys().collect();
+        let action_keys: Vec<String> = keys.iter().map(|symbol| symbol.to_string()).collect();
+        String::from("Expected ") + join_either_or(action_keys).as_str()
+    }
 }
 
 fn join_either_or(items: Vec<String>) -> String {
@@ -459,53 +494,4 @@ fn join_either_or(items: Vec<String>) -> String {
             format!("{} or {}", all_but_last.join(", "), last)
         }
     }
-}
-
-fn is_items_in_canonical_collection<AST: Clone, Token: Clone, TranslatorStack: Clone>(
-    states: Vec<State<AST, Token, TranslatorStack>>,
-    item: &Vec<Production<AST, Token, TranslatorStack>>,
-) -> (bool, Option<State<AST, Token, TranslatorStack>>) {
-    let mut contains = false;
-    for state in states.iter() {
-        if state.productions.len() != item.len() {
-            continue;
-        }
-        for production in item.iter() {
-            if state.productions.contains(production) {
-                contains = true;
-            } else {
-                contains = false;
-                break;
-            }
-        }
-        if contains {
-            return (contains, Some(state.clone()));
-        }
-    }
-    (contains, None)
-}
-
-fn compute_shift_reduce_productions<AST: Clone, Token: Clone, TranslatorStack: Clone>(
-    productions: &Vec<Production<AST, Token, TranslatorStack>>,
-) -> (
-    Vec<Production<AST, Token, TranslatorStack>>,
-    Vec<Production<AST, Token, TranslatorStack>>,
-) {
-    let filter_by_dot_at_the_rightend = |production: &Production<AST, Token, TranslatorStack>| {
-        production.cursor_pos == production.body.len()
-    };
-
-    let reduce_productions: Vec<Production<AST, Token, TranslatorStack>> = productions
-        .iter()
-        .cloned()
-        .filter(filter_by_dot_at_the_rightend)
-        .collect();
-
-    let shift_productions: Vec<Production<AST, Token, TranslatorStack>> = productions
-        .iter()
-        .cloned()
-        .filter(|p| !filter_by_dot_at_the_rightend(p))
-        .collect();
-
-    (reduce_productions, shift_productions)
 }

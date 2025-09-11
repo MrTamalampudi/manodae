@@ -58,6 +58,5 @@ pub fn compute_first_set<AST, Token, TranslatorStack>(
             }
         }
     }
-    println!("symbols --> {:#?}\nfirstmap --> {:#?}", symbols, first_map);
     first_map
 }

@@ -9,7 +9,7 @@ use crate::{
 use std::sync::Arc;
 
 #[test]
-fn basic() {
+fn left_factor() {
     let grammar: Grammar<AST, Token, TranslatorStack> = grammar!(
         Start -> E;
 
@@ -21,9 +21,11 @@ fn basic() {
 
         NE -> [Token::C] E;
 
-        CE -> E D E;
+        CE -> E D E| E F E;
 
         D -> [Token::D];
+
+        F -> [Token::F];
     );
     let mut parser = LR1_Parser::new(&grammar);
     parser.construct_LALR_Table();

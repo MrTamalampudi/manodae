@@ -1,8 +1,8 @@
-use std::fmt::Debug;
+use std::{collections::HashSet, fmt::Debug, hash::Hash};
 
 use crate::production::Production;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Symbol {
     TERMINAL(String),
     NONTERMINAL(String),
@@ -11,18 +11,15 @@ pub enum Symbol {
 
 pub fn unique_symbols<AST, Token, TranslatorStack>(
     productions: &Vec<Production<AST, Token, TranslatorStack>>,
-) -> Vec<Symbol> {
-    let mut symbols: Vec<Symbol> = Vec::new();
-
+) -> HashSet<Symbol> {
+    let mut symbols: HashSet<Symbol> = HashSet::new();
     for production in productions.iter() {
         for symbol in production.body.iter() {
-            if !symbols.contains(symbol) {
-                symbols.push(symbol.clone());
-            }
+            symbols.insert(symbol.clone());
         }
     }
     //eofff
-    symbols.push(Symbol::TERMINAL(String::from("EOF")));
+    symbols.insert(Symbol::TERMINAL(String::from("EOF")));
     symbols
 }
 

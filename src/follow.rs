@@ -9,7 +9,7 @@ use crate::{
 pub fn compute_follow_set<AST, Token, TranslatorStack>(
     productions: &Vec<Production<AST, Token, TranslatorStack>>,
 ) -> HashMap<Symbol, HashSet<String>> {
-    let symbols: Vec<Symbol> = unique_symbols(productions);
+    let symbols = unique_symbols(productions);
     let non_terminals: Vec<Symbol> = symbols
         .iter()
         .cloned()

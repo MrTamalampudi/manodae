@@ -1,21 +1,8 @@
 //cfg grammar should be in bnf format
 
-use std::fmt::Debug;
-
 use crate::production::Production;
 
-#[derive(Debug)]
-pub struct Grammar<AST, Token, TranslatorStack> {
-    pub productions: Vec<Production<AST, Token, TranslatorStack>>,
-}
-
-impl<AST, Token, TranslatorStack> Grammar<AST, Token, TranslatorStack> {
-    pub fn new() -> Grammar<AST, Token, TranslatorStack> {
-        Grammar {
-            productions: Vec::new(),
-        }
-    }
-}
+pub type Grammar<AST, Token, TranslatorStack> = Vec<Production<AST, Token, TranslatorStack>>;
 
 #[macro_export]
 macro_rules! grammar {
@@ -29,7 +16,15 @@ macro_rules! grammar {
             )|+
         );+;
     ) => {{
-        let mut grammar = Grammar::new();
+        let mut grammar = Vec::new();
+        let augmented_production = Production {
+            head: String::from("S'"),
+            body: vec![Symbol::NONTERMINAL(String::from("Start"))],
+            error_message: None,
+            #[allow(unused_variables)]
+            action: Some(Arc::new(|ast, token_stack, tl_stack, errors| {})),
+        };
+        grammar.push(augmented_production);
         $({
             $({let mut body_ : Vec<Symbol> = Vec::new();
             $($(body_.push(Symbol::TERMINAL($terminal.to_string()));)*)?
@@ -40,8 +35,6 @@ macro_rules! grammar {
             let mut production = Production {
                 head: stringify!($head).to_string(),
                 body: body_,
-                cursor_pos: 0,
-                index: grammar.productions.len() + 1,
                 error_message: None,
                 action:None
             };
@@ -53,7 +46,7 @@ macro_rules! grammar {
             $(
                 {production.action = Some(Arc::new(|$arg1,$arg2,$arg3,$arg4| $expr))}
             )?
-            grammar.productions.push(production);})+
+            grammar.push(production);})+
         })+
         grammar
     }}
