@@ -1,7 +1,10 @@
 [package]
-name = "slr-parser"
+name = "manodae"
 version = "0.1.0"
 edition = "2021"
+authors = ["Manikanta Reddy <manikantareddytamalampudi7@gmail.com>"]
+repository = "https://github.com/MRTamalampudi/manodae"
+description = "LALR Parser generator rust lib"
 
 [dependencies]
 indexmap = "2.11.0"
