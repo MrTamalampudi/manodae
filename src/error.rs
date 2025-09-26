@@ -5,3 +5,13 @@ pub struct ParseError<Token> {
     //if the error is at the end of production set true
     pub production_end: bool,
 }
+
+impl<Token> ParseError<Token> {
+    pub fn new(token: Token, message: String) -> ParseError<Token> {
+        ParseError {
+            token,
+            message,
+            production_end: false,
+        }
+    }
+}
