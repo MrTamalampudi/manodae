@@ -47,14 +47,12 @@ pub fn compute_first_set<AST, Token, TranslatorStack>(
                                         first_map.get(first).unwrap().iter().cloned().collect();
                                     a
                                 }
-                                _ => HashSet::new(),
                             };
                             let set = first_map.get_mut(symbol).unwrap();
                             set.extend(set_);
                         }
                     });
                 }
-                Symbol::NONE => continue,
             }
         }
     }

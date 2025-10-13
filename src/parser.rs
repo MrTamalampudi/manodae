@@ -3,10 +3,9 @@ use std::{
     fmt::Debug,
     process::exit,
     rc::Rc,
-    time::Instant,
 };
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 
 use crate::{
     action::Action,
@@ -26,7 +25,7 @@ const AUGMENTED_PRODUCTION_HEAD: &'static str = "S'";
 pub struct LR1_Parser<'a, AST, Token, TranslatorStack> {
     pub productions: &'a Vec<Production<AST, Token, TranslatorStack>>,
     pub LR1_automata: Vec<Rc<State<'a, AST, Token, TranslatorStack>>>,
-    pub symbols: HashSet<Symbol>, //every gramar symbol that exists in grammar
+    pub symbols: IndexSet<Symbol>, //every gramar symbol that exists in grammar
     pub follow_set: HashMap<Symbol, HashSet<String>>,
     pub first_set: HashMap<Symbol, HashSet<String>>,
     pub conflicts: bool,
@@ -50,7 +49,7 @@ where
         productions: &Vec<Production<AST, Token, TranslatorStack>>,
     ) -> LR1_Parser<AST, Token, TranslatorStack> {
         //collect all grammar symbols without duplicates
-        let symbols: HashSet<Symbol> = unique_symbols(&productions);
+        let symbols: IndexSet<Symbol> = unique_symbols(&productions);
 
         let first_set = compute_first_set(&productions);
         let follow_set = compute_follow_set(&productions);
@@ -368,6 +367,8 @@ where
         loop {
             S0 = stack.last().unwrap();
             //every state will be in action_map so unwrap
+            println!("state \n {:#?}", S0);
+            println!("current input \n {:#?}", current_input);
             let action_map = self.action.get(S0).unwrap();
             if let Some(action) = action_map.get(&current_input_symbol) {
                 match action {

@@ -1,4 +1,6 @@
-use std::{collections::HashSet, fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash};
+
+use indexmap::IndexSet;
 
 use crate::production::Production;
 
@@ -6,13 +8,12 @@ use crate::production::Production;
 pub enum Symbol {
     TERMINAL(String),
     NONTERMINAL(String),
-    NONE,
 }
 
 pub fn unique_symbols<AST, Token, TranslatorStack>(
     productions: &Vec<Production<AST, Token, TranslatorStack>>,
-) -> HashSet<Symbol> {
-    let mut symbols: HashSet<Symbol> = HashSet::new();
+) -> IndexSet<Symbol> {
+    let mut symbols: IndexSet<Symbol> = IndexSet::new();
     for production in productions.iter() {
         for symbol in production.body.iter() {
             symbols.insert(symbol.clone());
@@ -37,7 +38,6 @@ impl ToString for Symbol {
     fn to_string(&self) -> String {
         match self {
             Symbol::NONTERMINAL(string) | Self::TERMINAL(string) => string.clone(),
-            _ => String::from("None&&"),
         }
     }
 }
