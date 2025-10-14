@@ -23,6 +23,7 @@ macro_rules! grammar {
             error_message: None,
             #[allow(unused_variables)]
             action: Some(Arc::new(|ast, token_stack, tl_stack, errors| {})),
+            index: 0
         };
         grammar.push(augmented_production);
         $({
@@ -36,7 +37,8 @@ macro_rules! grammar {
                 head: stringify!($head).to_string(),
                 body: body_,
                 error_message: None,
-                action:None
+                action:None,
+                index: grammar.len()
             };
             $(
               if $error.to_string().len() > 0 {

@@ -68,7 +68,7 @@ pub fn render<AST, Token, TranslatorStack>(_parser: &LR1_Parser<AST, Token, Tran
                         use crate::action::Action::*;
                         match action {
                             SHIFT(state) => a.push_str(format!("S {}", state.index).as_str()),
-                            REDUCE(prod) => a.push_str(format!("R {}", prod.body.len()).as_str()),
+                            REDUCE(prod) => a.push_str(format!("R {}", prod.index).as_str()),
                             ACCEPT => a.push_str("ACCEPT"),
                             _ => {}
                         }
