@@ -41,3 +41,9 @@ impl ToString for Symbol {
         }
     }
 }
+
+impl From<&Symbol> for String {
+    fn from(value: &Symbol) -> Self {
+        value.to_string()
+    }
+}

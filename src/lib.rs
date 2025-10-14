@@ -9,6 +9,7 @@ pub mod grammar;
 pub mod item;
 pub mod parser;
 pub mod production;
+pub mod render_table;
 pub mod state;
 pub mod symbol;
 pub mod traits;
