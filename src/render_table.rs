@@ -93,15 +93,9 @@ pub fn render<AST, Token, TranslatorStack>(_parser: &LR1_Parser<AST, Token, Tran
         goto_table.push_record(goto_state.values());
     });
 
-    action_table.insert_column(
-        0,
-        once(String::new()).chain((0.._parser.LR1_automata.len()).map(|i| i.to_string())),
-    );
-
-    goto_table.insert_column(
-        0,
-        once(String::new()).chain((0.._parser.LR1_automata.len()).map(|i| i.to_string())),
-    );
+    let index = once(String::new()).chain(_parser.LR1_automata.iter().map(|i| i.index.to_string()));
+    action_table.insert_column(0, once(String::new()).chain(index.clone()));
+    goto_table.insert_column(0, once(String::new()).chain(index));
 
     let mut a_table = action_table.build();
     a_table.with(Style::rounded());

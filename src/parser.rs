@@ -367,8 +367,6 @@ where
         loop {
             S0 = stack.last().unwrap();
             //every state will be in action_map so unwrap
-            println!("state \n {:#?}", S0);
-            println!("current input \n {:#?}", current_input);
             let action_map = self.action.get(S0).unwrap();
             if let Some(action) = action_map.get(&current_input_symbol) {
                 match action {
@@ -419,7 +417,11 @@ where
                 let mut deduced_production: Option<Production<AST, Token, TranslatorStack>> = None;
                 loop {
                     stack.pop();
-                    S0 = stack.last().unwrap();
+                    let so_o = stack.last();
+                    if let None = so_o {
+                        break;
+                    }
+                    S0 = so_o.unwrap();
                     let goto_map = self.goto.get(S0).unwrap();
                     let keys: Vec<Symbol> = goto_map.clone().into_keys().collect();
                     let mut contains = false;
@@ -436,6 +438,9 @@ where
                 }
                 //skip input till input character contains in followset of ...
                 //top_state transition symbol
+                if let None = deduced_production {
+                    break;
+                }
                 let error_production_follow_set = self
                     .follow_set
                     .get(&Symbol::NONTERMINAL(
@@ -465,7 +470,11 @@ where
                     } else {
                         input_symbol_skip_count += 1;
                         previous_input = current_input;
-                        current_input = input_iter.next().unwrap();
+                        let ci_o = input_iter.next();
+                        if let None = ci_o {
+                            break;
+                        }
+                        current_input = ci_o.unwrap();
                         current_input_symbol = Symbol::TERMINAL(current_input.to_string());
                     }
                 }
