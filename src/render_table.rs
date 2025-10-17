@@ -44,7 +44,12 @@ pub fn render<AST, Token, TranslatorStack>(_parser: &LR1_Parser<AST, Token, Tran
 
     productions_table.insert_column(
         0,
-        once(String::new()).chain((0.._parser.productions.len()).map(|i| i.to_string())),
+        once(String::new()).chain(
+            _parser
+                .productions
+                .iter()
+                .map(|prod| prod.index.to_string()),
+        ),
     );
 
     let mut action_state: IndexMap<&Symbol, String> = IndexMap::new();
@@ -113,9 +118,64 @@ pub fn render<AST, Token, TranslatorStack>(_parser: &LR1_Parser<AST, Token, Tran
 
     println!("{p_table}");
 
+    render_states(_parser);
+
     println!("Action");
     println!("{a_table}");
 
     println!("GOTO");
     println!("{g_table}");
+}
+
+fn render_states<AST, Token, TranslatorStack>(_parser: &LR1_Parser<AST, Token, TranslatorStack>) {
+    for state in _parser.LR1_automata.iter() {
+        let mut state_builder = Builder::new();
+        let mut symbol_builder = Builder::new();
+        state_builder.push_record([
+            " ".to_string(),
+            format!("State {}", state.index.to_string()),
+        ]);
+        symbol_builder.push_record(["Symbol", "State"]);
+        for item in state.items.iter() {
+            let head = &item.production.head;
+            let mut body_1 = vec![];
+            let mut body_2 = vec![];
+            item.production
+                .body
+                .iter()
+                .enumerate()
+                .for_each(|(index, symbol)| {
+                    if index < (item.cursor as usize) {
+                        body_1.push(symbol.to_string());
+                    } else {
+                        body_2.push(symbol.to_string());
+                    }
+                });
+            state_builder.push_record([
+                head,
+                &format!(
+                    "{} . {} / {}",
+                    body_1.join(" "),
+                    body_2.join(" "),
+                    item.lookaheads
+                        .iter()
+                        .map(|la| la.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+            ]);
+        }
+        for (symbol, state_) in state.outgoing.iter() {
+            symbol_builder.push_record([symbol.to_string(), state_.borrow().index.to_string()]);
+        }
+
+        let mut a_table = state_builder.build();
+        a_table.with(Style::rounded());
+        let mut s_table = symbol_builder.build();
+        s_table.with(Style::rounded());
+
+        println!("-------- State {} --------", state.index);
+        println!("{}", a_table);
+        println!("{}", s_table);
+    }
 }
