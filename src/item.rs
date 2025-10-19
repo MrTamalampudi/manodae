@@ -2,7 +2,7 @@ use std::{fmt::Debug, hash::Hash, ptr};
 
 use indexmap::IndexMap;
 
-use crate::{production::Production, symbol::Symbol, traits::VecExtension};
+use crate::{production::Production, symbol::Symbol};
 
 #[derive(Debug, Clone)]
 pub struct Item<'a, AST, Token, TranslatorStack> {
@@ -24,21 +24,6 @@ impl<'a, AST, Token, TranslatorStack> Hash for Item<'a, AST, Token, TranslatorSt
         ptr::hash(self.production, state);
         self.cursor.hash(state);
     }
-}
-
-impl<'a, AST, Token, TranslatorStack> VecExtension<Item<'a, AST, Token, TranslatorStack>>
-    for Vec<Item<'a, AST, Token, TranslatorStack>>
-{
-    fn custom_contains(&self, other: &Item<'a, AST, Token, TranslatorStack>) -> bool {
-        self.iter().any(|item| {
-            ptr::eq(item.production, other.production)
-                && item.cursor == other.cursor
-                && item.lookaheads == other.lookaheads
-        })
-    }
-    // fn custom_eq(&self, others: Vec<Item<'a, AST, Token, TranslatorStack>>) -> bool {
-    //     self.iter().any(|item|)
-    // }
 }
 
 impl<'a, AST, Token, TranslatorStack> Item<'a, AST, Token, TranslatorStack> {
@@ -63,11 +48,12 @@ impl<'a, AST, Token, TranslatorStack> Item<'a, AST, Token, TranslatorStack> {
     }
 }
 
-pub trait ItemVecExtension {
+pub trait ItemVecExtension<T> {
     fn merge_cores(&mut self);
+    fn custom_contains(&self, item_to_find: &T) -> bool;
 }
 
-impl<'a, AST, Token, TranslatorStack> ItemVecExtension
+impl<'a, AST, Token, TranslatorStack> ItemVecExtension<Item<'a, AST, Token, TranslatorStack>>
     for Vec<Item<'a, AST, Token, TranslatorStack>>
 where
     AST: PartialEq + Clone + Debug,
@@ -93,5 +79,13 @@ where
         }
         self.clear();
         self.extend(new_items.into_values().collect::<Vec<_>>());
+    }
+
+    fn custom_contains(&self, other: &Item<'a, AST, Token, TranslatorStack>) -> bool {
+        self.iter().any(|item| {
+            ptr::eq(item.production, other.production)
+                && item.cursor == other.cursor
+                && item.lookaheads == other.lookaheads
+        })
     }
 }

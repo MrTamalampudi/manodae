@@ -1,4 +1,5 @@
 use std::{
+    cell::RefCell,
     collections::{HashMap, HashSet},
     fmt::Debug,
     process::exit,
@@ -16,7 +17,6 @@ use crate::{
     production::Production,
     state::{State, StateVecExtension},
     symbol::{unique_symbols, Symbol},
-    traits::VecExtension,
 };
 
 const AUGMENTED_PRODUCTION_HEAD: &'static str = "S'";
@@ -82,7 +82,7 @@ where
         let mut items_iterated_count = 0;
         while items.len().ne(&items_count) {
             items_count = items.len();
-            let mut new_items = Vec::new();
+            let mut new_items: Vec<Item<'a, AST, Token, TranslatorStack>> = Vec::new();
             for items_index in items_iterated_count..items.len() {
                 let item = items.get(items_index).unwrap();
                 let B = item.next_symbol();
@@ -138,11 +138,11 @@ where
     // }
     fn goto(
         &self,
-        items: &Vec<Item<'a, AST, Token, TranslatorStack>>,
+        state_: &Rc<RefCell<State<'a, AST, Token, TranslatorStack>>>,
         symbol: &Symbol,
-    ) -> State<'a, AST, Token, TranslatorStack> {
+    ) -> Rc<RefCell<State<'a, AST, Token, TranslatorStack>>> {
         let mut new_items = vec![];
-        for mut item in items.iter().cloned() {
+        for item in state_.borrow().items.iter() {
             let item_symbol = item.next_symbol();
             if item_symbol.is_none() {
                 continue;
@@ -150,14 +150,20 @@ where
             if symbol != item_symbol.unwrap() {
                 continue;
             }
+            let mut item = item.clone();
             item.advance_cursor();
             new_items.push(item);
         }
         let transition_productions = new_items.clone();
-        let mut state = State::new(0, new_items.clone(), transition_productions);
         self.clousure(&mut new_items);
-        state.items = new_items;
-        state
+        let state = State::new(
+            0,
+            new_items,
+            transition_productions,
+            IndexMap::new(),
+            vec![],
+        );
+        Rc::new(RefCell::new(state))
     }
 
     // Algorithm
@@ -178,11 +184,13 @@ where
         };
         let mut S0_items = vec![augmented_item];
         self.clousure(&mut S0_items);
-        let mut LR1_automata = vec![State {
+        let mut LR1_automata = vec![Rc::new(RefCell::new(State {
             transition_productions: vec![],
             index: 0,
             items: S0_items,
-        }];
+            outgoing: IndexMap::new(),
+            incoming: vec![],
+        }))];
         let mut states_count = 0;
         let mut states_iterated_count = 0;
         while LR1_automata.len().ne(&states_count) {
@@ -190,14 +198,21 @@ where
             let mut new_state = vec![];
             for states_index in states_iterated_count..LR1_automata.len() {
                 let state = LR1_automata.get(states_index).unwrap();
+                let mut goto_map = IndexMap::new();
                 for symbol in self.symbols.iter() {
-                    let goto_productions_state = self.goto(&state.items, symbol);
-                    if !goto_productions_state.items.is_empty()
-                        && !LR1_automata.custom_contains(&goto_productions_state)
+                    let goto_productions_state = self.goto(&state, symbol);
+                    let existing_state = LR1_automata.custom_get(&goto_productions_state);
+                    if !goto_productions_state.borrow().items.is_empty() && existing_state.is_none()
                     {
-                        new_state.push(goto_productions_state);
+                        goto_map.insert(symbol.clone(), Rc::clone(&goto_productions_state));
+                        new_state.push(Rc::clone(&goto_productions_state));
+                    }
+                    if let Some(e_state) = existing_state {
+                        goto_map.insert(symbol.clone(), Rc::clone(&e_state));
                     }
                 }
+                let state = LR1_automata.get(states_index).unwrap();
+                state.borrow_mut().outgoing = goto_map;
                 states_iterated_count += 1;
             }
             LR1_automata.extend(new_state);
@@ -205,11 +220,13 @@ where
         LR1_automata
             .iter_mut()
             .enumerate()
-            .for_each(|(index, state)| state.index = index);
+            .for_each(|(index, state)| state.borrow_mut().index = index);
+
+        LR1_automata.merge_sets();
 
         self.LR1_automata = LR1_automata
             .iter()
-            .map(|state| Rc::new(state.clone()))
+            .map(|state| Rc::new(state.borrow().clone()))
             .collect();
     }
 
@@ -238,7 +255,6 @@ where
     //     of items containing [𝑆' → .𝑆,$]
     pub fn construct_LALR_Table(&mut self) {
         self.items();
-        self.LR1_automata.merge_sets();
 
         let mut action: IndexMap<
             Rc<State<'a, AST, Token, TranslatorStack>>,
@@ -286,7 +302,7 @@ where
                 let symbol = next_symbol.unwrap();
                 let mut item_ = item.clone();
                 item_.advance_cursor();
-                let item_goto_state = transition_prod_map.get(&item_);
+                let item_goto_state = state.outgoing.get(symbol);
                 if item_goto_state.is_none() {
                     continue;
                 }
@@ -295,21 +311,24 @@ where
                     action
                         .entry(state.clone())
                         .and_modify(|map| {
-                            map.insert(symbol.clone(), Action::SHIFT(Rc::clone(item_goto_state)));
+                            map.insert(
+                                symbol.clone(),
+                                Action::SHIFT(Rc::new(item_goto_state.borrow().clone())),
+                            );
                         })
                         .or_insert(IndexMap::from([(
                             symbol.clone(),
-                            Action::SHIFT(Rc::clone(item_goto_state)),
+                            Action::SHIFT(Rc::new(item_goto_state.borrow().clone())),
                         )]));
                 }
                 if let Symbol::NONTERMINAL(_) = symbol {
                     goto.entry(state.clone())
                         .and_modify(|map| {
-                            map.insert(symbol.clone(), Rc::clone(item_goto_state));
+                            map.insert(symbol.clone(), Rc::new(item_goto_state.borrow().clone()));
                         })
                         .or_insert(IndexMap::from([(
                             symbol.clone(),
-                            Rc::clone(item_goto_state),
+                            Rc::new(item_goto_state.borrow().clone()),
                         )]));
                 }
             }
@@ -484,7 +503,7 @@ where
 
     fn counstruct_syntax_error_message(
         &self,
-        state: &State<AST, Token, TranslatorStack>,
+        state: &State<'a, AST, Token, TranslatorStack>,
     ) -> String {
         let action_map = self.action.get(state).unwrap();
         let keys: Vec<Symbol> = action_map.clone().into_keys().collect();
