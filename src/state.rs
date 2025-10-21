@@ -14,30 +14,30 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub struct State<'a, AST, Token, TranslatorStack> {
+pub struct State<AST, Token, TranslatorStack> {
     pub index: usize,
-    pub items: Vec<Item<'a, AST, Token, TranslatorStack>>,
-    pub transition_productions: Vec<Item<'a, AST, Token, TranslatorStack>>,
-    pub outgoing: IndexMap<Symbol, Rc<RefCell<State<'a, AST, Token, TranslatorStack>>>>,
-    pub incoming: Vec<Rc<RefCell<State<'a, AST, Token, TranslatorStack>>>>,
+    pub items: Vec<Item<AST, Token, TranslatorStack>>,
+    pub transition_productions: Vec<Item<AST, Token, TranslatorStack>>,
+    pub outgoing: IndexMap<Symbol, Rc<RefCell<State<AST, Token, TranslatorStack>>>>,
+    pub incoming: Vec<Rc<RefCell<State<AST, Token, TranslatorStack>>>>,
 }
 
-impl<'a, AST, Token, TranslatorStack> Hash for State<'a, AST, Token, TranslatorStack> {
+impl<AST, Token, TranslatorStack> Hash for State<AST, Token, TranslatorStack> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.items.hash(state);
         self.transition_productions.hash(state);
     }
 }
 
-impl<'a, AST, Token, TranslatorStack> Eq for State<'a, AST, Token, TranslatorStack> {}
+impl<AST, Token, TranslatorStack> Eq for State<AST, Token, TranslatorStack> {}
 
-impl<'a, AST, Token, TranslatorStack> PartialEq for State<'a, AST, Token, TranslatorStack> {
+impl<AST, Token, TranslatorStack> PartialEq for State<AST, Token, TranslatorStack> {
     fn eq(&self, other: &Self) -> bool {
         self.items == other.items && self.transition_productions == other.transition_productions
     }
 }
 
-impl<'a, AST, Token, TranslatorStack> State<'a, AST, Token, TranslatorStack>
+impl<AST, Token, TranslatorStack> State<AST, Token, TranslatorStack>
 where
     AST: Clone,
     Token: Clone,
@@ -45,11 +45,11 @@ where
 {
     pub fn new(
         index: usize,
-        items: Vec<Item<'a, AST, Token, TranslatorStack>>,
-        transition_productions: Vec<Item<'a, AST, Token, TranslatorStack>>,
-        outgoing: IndexMap<Symbol, Rc<RefCell<State<'a, AST, Token, TranslatorStack>>>>,
-        incoming: Vec<Rc<RefCell<State<'a, AST, Token, TranslatorStack>>>>,
-    ) -> State<'a, AST, Token, TranslatorStack> {
+        items: Vec<Item<AST, Token, TranslatorStack>>,
+        transition_productions: Vec<Item<AST, Token, TranslatorStack>>,
+        outgoing: IndexMap<Symbol, Rc<RefCell<State<AST, Token, TranslatorStack>>>>,
+        incoming: Vec<Rc<RefCell<State<AST, Token, TranslatorStack>>>>,
+    ) -> State<AST, Token, TranslatorStack> {
         State {
             index,
             items,
@@ -66,8 +66,8 @@ pub trait StateVecExtension<T> {
     fn custom_contains(&self, other: &Rc<RefCell<T>>) -> bool;
 }
 
-impl<'a, AST, Token, TranslatorStack> StateVecExtension<State<'a, AST, Token, TranslatorStack>>
-    for Vec<Rc<RefCell<State<'a, AST, Token, TranslatorStack>>>>
+impl<AST, Token, TranslatorStack> StateVecExtension<State<AST, Token, TranslatorStack>>
+    for Vec<Rc<RefCell<State<AST, Token, TranslatorStack>>>>
 where
     AST: Clone + PartialEq + Debug,
     Token: Clone + PartialEq + Debug,
@@ -75,8 +75,8 @@ where
 {
     fn merge_sets(&mut self) {
         let mut new_states: IndexMap<
-            State<'a, AST, Token, TranslatorStack>,
-            Rc<RefCell<State<'a, AST, Token, TranslatorStack>>>,
+            State<AST, Token, TranslatorStack>,
+            Rc<RefCell<State<AST, Token, TranslatorStack>>>,
         > = IndexMap::new();
         for state in self.iter() {
             let state_entry = new_states
@@ -125,14 +125,14 @@ where
 
     fn custom_get(
         &self,
-        state: &Rc<RefCell<State<'a, AST, Token, TranslatorStack>>>,
-    ) -> Option<Rc<RefCell<State<'a, AST, Token, TranslatorStack>>>> {
+        state: &Rc<RefCell<State<AST, Token, TranslatorStack>>>,
+    ) -> Option<Rc<RefCell<State<AST, Token, TranslatorStack>>>> {
         self.iter()
             .cloned()
             .find(|state_ref| state_ref.borrow().clone().eq(&state.borrow().clone()))
     }
 
-    fn custom_contains(&self, other: &Rc<RefCell<State<'a, AST, Token, TranslatorStack>>>) -> bool {
+    fn custom_contains(&self, other: &Rc<RefCell<State<AST, Token, TranslatorStack>>>) -> bool {
         self.iter().any(|state| {
             state
                 .borrow()

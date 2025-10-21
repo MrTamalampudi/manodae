@@ -1,4 +1,4 @@
-use std::{hash::Hash, sync::Arc};
+use std::{hash::Hash, rc::Rc, sync::Arc};
 
 use crate::{error::ParseError, symbol::Symbol};
 
@@ -6,7 +6,7 @@ use crate::{error::ParseError, symbol::Symbol};
 pub struct Production<AST, Token, TranslatorStack> {
     pub index: usize,
     pub head: String,
-    pub body: Vec<Symbol>,
+    pub body: Vec<Rc<Symbol>>,
     pub error_message: Option<String>,
     pub action: Option<
         Arc<

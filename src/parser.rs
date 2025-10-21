@@ -13,46 +13,45 @@ use crate::{
     error::ParseError,
     first::compute_first_set,
     follow::compute_follow_set,
+    grammar::Grammar,
     item::{Item, ItemVecExtension},
     production::Production,
     state::{State, StateVecExtension},
-    symbol::{unique_symbols, Symbol},
+    symbol::Symbol,
 };
 
 const AUGMENTED_PRODUCTION_HEAD: &'static str = "S'";
 
 #[derive(Debug, Clone)]
-pub struct LR1_Parser<'a, AST, Token, TranslatorStack> {
-    pub productions: &'a Vec<Production<AST, Token, TranslatorStack>>,
-    pub LR1_automata: Vec<Rc<State<'a, AST, Token, TranslatorStack>>>,
-    pub symbols: IndexSet<Symbol>, //every gramar symbol that exists in grammar
+pub struct LR1_Parser<AST, Token, TranslatorStack> {
+    pub grammar: Grammar<AST, Token, TranslatorStack>,
+    pub LR1_automata: Vec<Rc<State<AST, Token, TranslatorStack>>>,
     pub follow_set: HashMap<Symbol, HashSet<String>>,
     pub first_set: HashMap<Symbol, HashSet<String>>,
     pub conflicts: bool,
     pub goto: IndexMap<
-        Rc<State<'a, AST, Token, TranslatorStack>>,
-        IndexMap<Symbol, Rc<State<'a, AST, Token, TranslatorStack>>>,
+        Rc<State<AST, Token, TranslatorStack>>,
+        IndexMap<Symbol, Rc<State<AST, Token, TranslatorStack>>>,
     >,
     pub action: IndexMap<
-        Rc<State<'a, AST, Token, TranslatorStack>>,
-        IndexMap<Symbol, Action<'a, AST, Token, TranslatorStack>>,
+        Rc<State<AST, Token, TranslatorStack>>,
+        IndexMap<Symbol, Action<AST, Token, TranslatorStack>>,
     >,
 }
 
-impl<'a, AST, Token, TranslatorStack> LR1_Parser<'a, AST, Token, TranslatorStack>
+impl<AST, Token, TranslatorStack> LR1_Parser<AST, Token, TranslatorStack>
 where
     AST: Clone + Debug + PartialEq,
     Token: ToString + Debug + Clone + PartialEq,
     TranslatorStack: Clone + Debug + PartialEq,
 {
     pub fn new(
-        productions: &Vec<Production<AST, Token, TranslatorStack>>,
+        grammar: Grammar<AST, Token, TranslatorStack>,
     ) -> LR1_Parser<AST, Token, TranslatorStack> {
         //collect all grammar symbols without duplicates
-        let symbols: IndexSet<Symbol> = unique_symbols(&productions);
 
-        let first_set = compute_first_set(&productions);
-        let follow_set = compute_follow_set(&productions);
+        let first_set = compute_first_set(&grammar);
+        let follow_set = compute_follow_set(&grammar);
 
         let mut a = LR1_Parser {
             productions: productions,
