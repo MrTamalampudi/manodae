@@ -1,17 +1,17 @@
-use std::{collections::HashSet, ops::Deref, rc::Rc};
+use std::{ops::Deref, rc::Rc};
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 
 use crate::{first::compute_first_set, grammar::Grammar, production::Production, symbol::Symbol};
 
 pub fn compute_follow_set<AST, Token, TranslatorStack>(
     grammar: &Grammar<AST, Token, TranslatorStack>,
-) -> IndexMap<Rc<Symbol>, HashSet<Rc<Symbol>>> {
-    let mut follow_map: IndexMap<Rc<Symbol>, HashSet<Rc<Symbol>>> = IndexMap::new();
+) -> IndexMap<Rc<Symbol>, IndexSet<Rc<Symbol>>> {
+    let mut follow_map: IndexMap<Rc<Symbol>, IndexSet<Rc<Symbol>>> = IndexMap::new();
 
     //populate with empty vectors
     grammar.non_terminals.iter().for_each(|symbol| {
-        follow_map.insert(Rc::clone(symbol), HashSet::new());
+        follow_map.insert(Rc::clone(symbol), IndexSet::new());
     });
 
     let augment_production: Option<&Rc<Production<AST, Token, TranslatorStack>>> = grammar
@@ -28,7 +28,7 @@ pub fn compute_follow_set<AST, Token, TranslatorStack>(
                 Symbol::NONTERMINAL(_) => {
                     follow_map.insert(
                         start.clone(),
-                        HashSet::from([Rc::new(Symbol::TERMINAL(String::from("EOF")))]),
+                        IndexSet::from([Rc::new(Symbol::TERMINAL(String::from("EOF")))]),
                     );
                 }
                 _ => {}
@@ -61,7 +61,7 @@ pub fn compute_follow_set<AST, Token, TranslatorStack>(
                     follow_map
                         .entry(non_terminal.clone())
                         .and_modify(|token_types| token_types.extend(first_.clone()))
-                        .or_insert(HashSet::from_iter(first_.iter().cloned()));
+                        .or_insert(IndexSet::from_iter(first_.iter().cloned()));
                 }
             }
         }
@@ -69,7 +69,7 @@ pub fn compute_follow_set<AST, Token, TranslatorStack>(
 
     //A->aB then everything in  Follow(A) is in Follow(B)
     loop {
-        let follow_count_func = |follow_map: &IndexMap<Rc<Symbol>, HashSet<Rc<Symbol>>>| {
+        let follow_count_func = |follow_map: &IndexMap<Rc<Symbol>, IndexSet<Rc<Symbol>>>| {
             follow_map
                 .values()
                 .flat_map(|token_types| token_types)

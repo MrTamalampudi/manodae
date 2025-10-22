@@ -8,7 +8,7 @@ use crate::{production::Production, symbol::Symbol};
 pub struct Item<AST, Token, TranslatorStack> {
     pub production: Rc<Production<AST, Token, TranslatorStack>>,
     pub cursor: u8,
-    pub lookaheads: Vec<Symbol>,
+    pub lookaheads: Vec<Rc<Symbol>>,
 }
 
 impl<AST, Token, TranslatorStack> PartialEq for Item<AST, Token, TranslatorStack> {

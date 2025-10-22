@@ -37,7 +37,7 @@ macro_rules! grammar {
             )|+
         );+;
     ) => {{
-        let mut grammar = crate::grammar::Grammar::new();
+        let mut grammar = Grammar::new();
         let mut non_terminals = indexmap::IndexSet::new();
         let mut terminals = indexmap::IndexSet::new();
         let augmented_production = Production {
@@ -57,7 +57,7 @@ macro_rules! grammar {
                     body_.push(std::rc::Rc::clone(&terminal_ref));
                 )?
                 $(
-                    let non_terminal_ref = std::rc::Rc::new(Symbol::NONTERMINAL($non_terminal.to_string()));
+                    let non_terminal_ref = std::rc::Rc::new(Symbol::NONTERMINAL(stringify!($non_terminal).to_string()));
                     non_terminals.insert(std::rc::Rc::clone(&non_terminal_ref));
                     body_.push(std::rc::Rc::clone(&non_terminal_ref));
                 )*
@@ -79,6 +79,8 @@ macro_rules! grammar {
             )?
             grammar.productions.insert(std::rc::Rc::new(production));})+
         })+
+        grammar.terminals = terminals;
+        grammar.non_terminals = non_terminals;
         grammar
     }}
 }

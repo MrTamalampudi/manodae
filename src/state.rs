@@ -18,7 +18,7 @@ pub struct State<AST, Token, TranslatorStack> {
     pub index: usize,
     pub items: Vec<Item<AST, Token, TranslatorStack>>,
     pub transition_productions: Vec<Item<AST, Token, TranslatorStack>>,
-    pub outgoing: IndexMap<Symbol, Rc<RefCell<State<AST, Token, TranslatorStack>>>>,
+    pub outgoing: IndexMap<Rc<Symbol>, Rc<RefCell<State<AST, Token, TranslatorStack>>>>,
     pub incoming: Vec<Rc<RefCell<State<AST, Token, TranslatorStack>>>>,
 }
 
@@ -47,7 +47,7 @@ where
         index: usize,
         items: Vec<Item<AST, Token, TranslatorStack>>,
         transition_productions: Vec<Item<AST, Token, TranslatorStack>>,
-        outgoing: IndexMap<Symbol, Rc<RefCell<State<AST, Token, TranslatorStack>>>>,
+        outgoing: IndexMap<Rc<Symbol>, Rc<RefCell<State<AST, Token, TranslatorStack>>>>,
         incoming: Vec<Rc<RefCell<State<AST, Token, TranslatorStack>>>>,
     ) -> State<AST, Token, TranslatorStack> {
         State {
