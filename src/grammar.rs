@@ -2,7 +2,7 @@
 
 use std::rc::Rc;
 
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 
 use crate::{production::Production, symbol::Symbol};
 
@@ -12,6 +12,8 @@ pub struct Grammar<AST, Token, TranslatorStack> {
     pub terminals: IndexSet<Rc<Symbol>>,
     pub start: Rc<Symbol>,
     pub productions: IndexSet<Rc<Production<AST, Token, TranslatorStack>>>,
+    pub production_head_map:
+        IndexMap<String, IndexSet<Rc<Production<AST, Token, TranslatorStack>>>>,
 }
 
 impl<AST, Token, TranslatorStack> Grammar<AST, Token, TranslatorStack> {
@@ -21,6 +23,7 @@ impl<AST, Token, TranslatorStack> Grammar<AST, Token, TranslatorStack> {
             terminals: IndexSet::new(),
             start: Rc::new(Symbol::NONTERMINAL("Start".to_string())),
             productions: IndexSet::new(),
+            production_head_map: IndexMap::new(),
         }
     }
 }

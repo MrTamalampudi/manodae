@@ -1,4 +1,4 @@
-use std::{cell::RefCell, fmt::Debug, ops::Deref, process::exit, rc::Rc};
+use std::{cell::RefCell, fmt::Debug, ops::Deref, process::exit, rc::Rc, time::Instant};
 
 use indexmap::{IndexMap, IndexSet};
 
@@ -47,6 +47,20 @@ where
         let first_set = compute_first_set(&grammar);
         let follow_set = compute_follow_set(&grammar);
 
+        let mut production_head_map: IndexMap<
+            String,
+            IndexSet<Rc<Production<AST, Token, TranslatorStack>>>,
+        > = IndexMap::new();
+
+        grammar.productions.iter().for_each(|production| {
+            production_head_map
+                .entry(production.head.clone())
+                .and_modify(|entry| {
+                    entry.insert(Rc::clone(production));
+                })
+                .or_insert(IndexSet::from([Rc::clone(production)]));
+        });
+
         let mut a = LR1_Parser {
             grammar,
             LR1_automata: Vec::new(),
@@ -56,6 +70,7 @@ where
             action: IndexMap::new(),
             goto: IndexMap::new(),
         };
+        a.grammar.production_head_map = production_head_map;
         a.construct_LALR_Table();
         a
     }
@@ -91,24 +106,23 @@ where
                 if production_B.is_terminal() {
                     continue;
                 }
-                let b_productions: Vec<_> = self
+                let b_productions: &IndexSet<_> = self
                     .grammar
-                    .productions
-                    .iter()
-                    .filter(|production| production.head.eq(&production_B.to_string()))
-                    .collect();
-                for b_production in b_productions.iter() {
-                    let mut lookaheads = Vec::new();
-                    for first in first_of.iter() {
-                        for terminal_b in self.first_set.get(first).unwrap().iter() {
-                            lookaheads.push(Rc::clone(terminal_b));
-                        }
+                    .production_head_map
+                    .get(&production_B.to_string())
+                    .unwrap();
+                let mut lookaheads = Vec::new();
+                for first in first_of.iter() {
+                    for terminal_b in self.first_set.get(first).unwrap().iter() {
+                        lookaheads.push(Rc::clone(terminal_b));
                     }
-                    let p = *b_production;
+                }
+                for b_production in b_productions.iter() {
+                    let p = b_production.deref();
                     let item_ = Item {
-                        production: Rc::clone(p),
+                        production: Rc::new(p.clone()),
                         cursor: 0,
-                        lookaheads: lookaheads,
+                        lookaheads: lookaheads.clone(),
                     };
                     if items.custom_contains(&item_) || new_items.custom_contains(&item_) {
                         continue;
