@@ -124,7 +124,7 @@ where
                         cursor: 0,
                         lookaheads: lookaheads.clone(),
                     };
-                    if items.custom_contains(&item_) || new_items.custom_contains(&item_) {
+                    if items.contains(&item_) || new_items.contains(&item_) {
                         continue;
                     }
                     new_items.push(item_);
@@ -147,7 +147,7 @@ where
         &self,
         state_: &Rc<RefCell<State<AST, Token, TranslatorStack>>>,
         symbol: &Rc<Symbol>,
-    ) -> Rc<RefCell<State<AST, Token, TranslatorStack>>> {
+    ) -> Option<Rc<RefCell<State<AST, Token, TranslatorStack>>>> {
         let mut new_items = vec![];
         for item in state_.borrow().items.iter() {
             let item_symbol = item.next_symbol();
@@ -161,6 +161,9 @@ where
             item.advance_cursor();
             new_items.push(item);
         }
+        if new_items.is_empty() {
+            return None;
+        }
         let transition_productions = new_items.clone();
         self.clousure(&mut new_items);
         let state = State::new(
@@ -170,7 +173,7 @@ where
             IndexMap::new(),
             vec![],
         );
-        Rc::new(RefCell::new(state))
+        Some(Rc::new(RefCell::new(state)))
     }
 
     // Algorithm
@@ -211,6 +214,10 @@ where
                 let mut goto_map = IndexMap::new();
                 for symbol in symbols.iter() {
                     let goto_productions_state = self.goto(&state, symbol);
+                    if goto_productions_state.is_none() {
+                        continue;
+                    }
+                    let goto_productions_state = goto_productions_state.unwrap();
                     let existing_state = LR1_automata.custom_get(&goto_productions_state);
                     if !goto_productions_state.borrow().items.is_empty() && existing_state.is_none()
                     {

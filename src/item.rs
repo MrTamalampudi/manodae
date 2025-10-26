@@ -13,7 +13,9 @@ pub struct Item<AST, Token, TranslatorStack> {
 
 impl<AST, Token, TranslatorStack> PartialEq for Item<AST, Token, TranslatorStack> {
     fn eq(&self, other: &Self) -> bool {
-        self.production.eq(&other.production) && self.cursor == other.cursor
+        self.production.eq(&other.production)
+            && self.cursor == other.cursor
+            && self.lookaheads == other.lookaheads
     }
 }
 
@@ -23,6 +25,7 @@ impl<AST, Token, TranslatorStack> Hash for Item<AST, Token, TranslatorStack> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.production.hash(state);
         self.cursor.hash(state);
+        self.lookaheads.hash(state);
     }
 }
 
@@ -50,7 +53,6 @@ impl<AST, Token, TranslatorStack> Item<AST, Token, TranslatorStack> {
 
 pub trait ItemVecExtension<T> {
     fn merge_cores(&mut self);
-    fn custom_contains(&self, item_to_find: &T) -> bool;
 }
 
 impl<'a, AST, Token, TranslatorStack> ItemVecExtension<Item<AST, Token, TranslatorStack>>
@@ -62,12 +64,12 @@ where
 {
     fn merge_cores(&mut self) {
         let mut new_items: IndexMap<
-            Item<AST, Token, TranslatorStack>,
+            (Rc<Production<AST, Token, TranslatorStack>>, u8),
             Item<AST, Token, TranslatorStack>,
         > = IndexMap::new();
         for item in self.iter() {
             new_items
-                .entry(item.clone())
+                .entry((Rc::clone(&item.production), item.cursor))
                 .and_modify(|new_item: &mut Item<AST, Token, TranslatorStack>| {
                     for la in item.lookaheads.iter() {
                         if !new_item.lookaheads.contains(la) {
@@ -79,13 +81,5 @@ where
         }
         self.clear();
         self.extend(new_items.into_values().collect::<Vec<_>>());
-    }
-
-    fn custom_contains(&self, other: &Item<AST, Token, TranslatorStack>) -> bool {
-        self.iter().any(|item| {
-            item.production.eq(&other.production)
-                && item.cursor == other.cursor
-                && item.lookaheads == other.lookaheads
-        })
     }
 }

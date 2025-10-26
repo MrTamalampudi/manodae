@@ -25,7 +25,6 @@ pub struct State<AST, Token, TranslatorStack> {
 impl<AST, Token, TranslatorStack> Hash for State<AST, Token, TranslatorStack> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.items.hash(state);
-        self.transition_productions.hash(state);
     }
 }
 
@@ -33,7 +32,7 @@ impl<AST, Token, TranslatorStack> Eq for State<AST, Token, TranslatorStack> {}
 
 impl<AST, Token, TranslatorStack> PartialEq for State<AST, Token, TranslatorStack> {
     fn eq(&self, other: &Self) -> bool {
-        self.items == other.items && self.transition_productions == other.transition_productions
+        self.items == other.items
     }
 }
 
@@ -138,7 +137,7 @@ where
                 .borrow()
                 .items
                 .iter()
-                .any(|item| other.borrow().items.custom_contains(item))
+                .any(|item| other.borrow().items.contains(item))
                 && state.borrow().transition_productions == other.borrow().transition_productions
                 && state.borrow().index == other.borrow().index
         })
