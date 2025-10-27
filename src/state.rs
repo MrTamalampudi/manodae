@@ -24,7 +24,10 @@ pub struct State<AST, Token, TranslatorStack> {
 
 impl<AST, Token, TranslatorStack> Hash for State<AST, Token, TranslatorStack> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.items.hash(state);
+        self.items.iter().for_each(|item| {
+            item.cursor.hash(state);
+            item.production.hash(state);
+        });
     }
 }
 
@@ -32,7 +35,12 @@ impl<AST, Token, TranslatorStack> Eq for State<AST, Token, TranslatorStack> {}
 
 impl<AST, Token, TranslatorStack> PartialEq for State<AST, Token, TranslatorStack> {
     fn eq(&self, other: &Self) -> bool {
-        self.items == other.items
+        for (item, item2) in self.items.iter().zip(other.items.iter()) {
+            if item.cursor != item2.cursor || item.production != item2.production {
+                return false;
+            }
+        }
+        return true;
     }
 }
 

@@ -201,6 +201,7 @@ where
             outgoing: IndexMap::new(),
             incoming: vec![],
         }))];
+        let mut goto_set = IndexMap::new();
         let mut states_count = 0;
         let mut states_iterated_count = 0;
         let mut symbols = vec![];
@@ -213,19 +214,22 @@ where
                 let state = LR1_automata.get(states_index).unwrap();
                 let mut goto_map = IndexMap::new();
                 for symbol in symbols.iter() {
-                    let goto_productions_state = self.goto(&state, symbol);
-                    if goto_productions_state.is_none() {
-                        continue;
-                    }
-                    let goto_productions_state = goto_productions_state.unwrap();
-                    let existing_state = LR1_automata.custom_get(&goto_productions_state);
-                    if !goto_productions_state.borrow().items.is_empty() && existing_state.is_none()
-                    {
+                    let items = state.borrow().items.clone();
+                    let es = goto_set.get(&(items.clone(), Rc::clone(symbol)));
+                    if let Some(es) = es {
+                        goto_map.insert(Rc::clone(symbol), Rc::clone(es));
+                    } else {
+                        let goto_productions_state = self.goto(&state, symbol);
+                        if goto_productions_state.is_none() {
+                            continue;
+                        }
+                        let goto_productions_state = goto_productions_state.unwrap();
+                        goto_set.insert(
+                            (items, Rc::clone(symbol)),
+                            Rc::clone(&goto_productions_state),
+                        );
                         goto_map.insert(Rc::clone(symbol), Rc::clone(&goto_productions_state));
                         new_state.push(Rc::clone(&goto_productions_state));
-                    }
-                    if let Some(e_state) = existing_state {
-                        goto_map.insert(Rc::clone(symbol), Rc::clone(&e_state));
                     }
                 }
                 let state = LR1_automata.get(states_index).unwrap();
