@@ -31,6 +31,10 @@ pub struct LR1_Parser<AST, Token, TranslatorStack> {
         Rc<State<AST, Token, TranslatorStack>>,
         IndexMap<Rc<Symbol>, Action<AST, Token, TranslatorStack>>,
     >,
+    item_closure_map:
+        IndexMap<Item<AST, Token, TranslatorStack>, Vec<Item<AST, Token, TranslatorStack>>>,
+    closure_map:
+        IndexMap<Vec<Item<AST, Token, TranslatorStack>>, Vec<Item<AST, Token, TranslatorStack>>>,
 }
 
 impl<AST, Token, TranslatorStack> LR1_Parser<AST, Token, TranslatorStack>
@@ -69,6 +73,8 @@ where
             conflicts: false,
             action: IndexMap::new(),
             goto: IndexMap::new(),
+            item_closure_map: IndexMap::new(),
+            closure_map: IndexMap::new(),
         };
         a.grammar.production_head_map = production_head_map;
         a.construct_LALR_Table();
@@ -84,7 +90,7 @@ where
     //                   add [𝐵 → .𝛾,𝑏] to set 𝐼
     //   until no more items are added to 𝐼
     // }
-    fn clousure(&self, items: &mut Vec<Item<AST, Token, TranslatorStack>>) {
+    fn clousure(&mut self, items: &mut Vec<Item<AST, Token, TranslatorStack>>) {
         let mut items_count = 0;
         let mut items_iterated_count = 0;
         while items.len().ne(&items_count) {
@@ -92,42 +98,50 @@ where
             let mut new_items: Vec<Item<AST, Token, TranslatorStack>> = Vec::new();
             for items_index in items_iterated_count..items.len() {
                 let item = items.get(items_index).unwrap();
-                let B = item.next_symbol();
-                let beta = item.production.body.get((item.cursor + 1) as usize);
-                let first_of = if let Some(beta) = beta {
-                    vec![beta.clone()]
+                let existing_item = self.item_closure_map.get(item);
+                if let Some(ei) = existing_item {
+                    new_items.extend(ei.clone());
                 } else {
-                    item.lookaheads.clone()
-                };
-                if let None = B {
-                    continue;
-                }
-                let production_B = B.unwrap();
-                if production_B.is_terminal() {
-                    continue;
-                }
-                let b_productions: &IndexSet<_> = self
-                    .grammar
-                    .production_head_map
-                    .get(&production_B.to_string())
-                    .unwrap();
-                let mut lookaheads = Vec::new();
-                for first in first_of.iter() {
-                    for terminal_b in self.first_set.get(first).unwrap().iter() {
-                        lookaheads.push(Rc::clone(terminal_b));
-                    }
-                }
-                for b_production in b_productions.iter() {
-                    let p = b_production.deref();
-                    let item_ = Item {
-                        production: Rc::new(p.clone()),
-                        cursor: 0,
-                        lookaheads: lookaheads.clone(),
+                    let B = item.next_symbol();
+                    let beta = item.production.body.get((item.cursor + 1) as usize);
+                    let first_of = if let Some(beta) = beta {
+                        vec![beta.clone()]
+                    } else {
+                        item.lookaheads.clone()
                     };
-                    if items.contains(&item_) || new_items.contains(&item_) {
+                    if let None = B {
                         continue;
                     }
-                    new_items.push(item_);
+                    let B = B.unwrap();
+                    if B.is_terminal() {
+                        continue;
+                    }
+                    let b_productions: &IndexSet<_> = self
+                        .grammar
+                        .production_head_map
+                        .get(&B.to_string())
+                        .unwrap();
+                    let mut lookaheads = Vec::new();
+                    for first in first_of.iter() {
+                        for terminal_b in self.first_set.get(first).unwrap().iter() {
+                            lookaheads.push(Rc::clone(terminal_b));
+                        }
+                    }
+                    let mut ni = vec![];
+                    for b_production in b_productions.iter() {
+                        let p = b_production.deref();
+                        let item_ = Item {
+                            production: Rc::new(p.clone()),
+                            cursor: 0,
+                            lookaheads: lookaheads.clone(),
+                        };
+                        if items.contains(&item_) || new_items.contains(&item_) {
+                            continue;
+                        }
+                        ni.push(item_);
+                    }
+                    self.item_closure_map.insert(item.clone(), ni.clone());
+                    new_items.extend(ni.clone());
                 }
                 items_iterated_count += 1;
             }
@@ -144,7 +158,7 @@ where
     //   return 𝐶𝐿𝑂𝑆𝑈𝑅𝐸(𝐽);
     // }
     fn goto(
-        &self,
+        &mut self,
         state_: &Rc<RefCell<State<AST, Token, TranslatorStack>>>,
         symbol: &Rc<Symbol>,
     ) -> Option<Rc<RefCell<State<AST, Token, TranslatorStack>>>> {
@@ -165,7 +179,14 @@ where
             return None;
         }
         let transition_productions = new_items.clone();
-        self.clousure(&mut new_items);
+        let exisisting_closure_map = self.closure_map.get(&new_items);
+        if let Some(ecm) = exisisting_closure_map {
+            new_items = ecm.clone();
+        } else {
+            self.clousure(&mut new_items);
+            self.closure_map
+                .insert(transition_productions.clone(), new_items.clone());
+        }
         let state = State::new(
             0,
             new_items,
@@ -205,8 +226,8 @@ where
         let mut states_count = 0;
         let mut states_iterated_count = 0;
         let mut symbols = vec![];
-        symbols.extend(&self.grammar.non_terminals);
-        symbols.extend(&self.grammar.terminals);
+        symbols.extend(self.grammar.non_terminals.clone());
+        symbols.extend(self.grammar.terminals.clone());
         while LR1_automata.len().ne(&states_count) {
             states_count = LR1_automata.len();
             let mut new_state = vec![];
