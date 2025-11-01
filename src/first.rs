@@ -1,26 +1,28 @@
-use std::collections::{HashMap, HashSet};
+use std::{ops::Deref, rc::Rc};
 
-use crate::{
-    production::Production,
-    symbol::{unique_symbols, Symbol},
-};
+use indexmap::{IndexMap, IndexSet};
+
+use crate::{grammar::Grammar, symbol::Symbol};
 
 pub fn compute_first_set<AST, Token, TranslatorStack>(
-    productions: &Vec<Production<AST, Token, TranslatorStack>>,
-) -> HashMap<Symbol, HashSet<String>> {
-    let symbols = unique_symbols(productions);
-    let mut first_map: HashMap<Symbol, HashSet<String>> = HashMap::new();
-    let mut first_map_: HashMap<Symbol, HashSet<String>> = HashMap::new();
-    let mut productions_hashmap: HashMap<Symbol, Vec<Vec<Symbol>>> = HashMap::new();
+    productions: &Grammar<AST, Token, TranslatorStack>,
+) -> IndexMap<Rc<Symbol>, IndexSet<Rc<Symbol>>> {
+    let mut first_map: IndexMap<Rc<Symbol>, IndexSet<Rc<Symbol>>> = IndexMap::new();
+    let mut first_map_: IndexMap<Rc<Symbol>, IndexSet<Rc<Symbol>>> = IndexMap::new();
+    let mut productions_hashmap: IndexMap<Rc<Symbol>, Vec<Vec<Rc<Symbol>>>> = IndexMap::new();
+
+    let mut symbols = vec![Rc::new(Symbol::TERMINAL(String::from("EOF")))];
+    symbols.extend(productions.non_terminals.clone());
+    symbols.extend(productions.terminals.clone());
 
     symbols.iter().for_each(|symbol| {
-        first_map.insert(symbol.clone(), HashSet::new());
-        if let Symbol::NONTERMINAL(_) = symbol {
+        first_map.insert(symbol.clone(), IndexSet::new());
+        if let Symbol::NONTERMINAL(_) = symbol.deref() {
             productions_hashmap.insert(symbol.clone(), Vec::new());
         }
     });
 
-    for production in productions.iter() {
+    for production in productions.productions.iter() {
         let p = productions_hashmap.get_mut(&Symbol::NONTERMINAL(production.head.clone()));
         if let Some(bodies) = p {
             bodies.push(production.body.clone());
@@ -31,19 +33,19 @@ pub fn compute_first_set<AST, Token, TranslatorStack>(
         first_map_.clear();
         first_map_ = first_map.clone();
         for symbol in symbols.iter() {
-            match symbol {
-                Symbol::TERMINAL(terminal) => {
-                    first_map.insert(symbol.clone(), HashSet::from([terminal.clone()]));
+            match symbol.deref() {
+                Symbol::TERMINAL(_) => {
+                    first_map.insert(symbol.clone(), IndexSet::from([symbol.clone()]));
                 }
                 Symbol::NONTERMINAL(_) => {
                     let p = productions_hashmap.get(symbol).unwrap();
                     p.iter().for_each(|body| {
                         if !body.is_empty() {
                             let first = body.first().unwrap();
-                            let set_ = match first {
-                                Symbol::TERMINAL(_) => HashSet::from([first.to_string()]),
+                            let set_ = match first.deref() {
+                                Symbol::TERMINAL(_) => IndexSet::from([first.clone()]),
                                 Symbol::NONTERMINAL(_) => {
-                                    let a: HashSet<String> =
+                                    let a: IndexSet<Rc<Symbol>> =
                                         first_map.get(first).unwrap().iter().cloned().collect();
                                     a
                                 }

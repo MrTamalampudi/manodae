@@ -1,44 +1,76 @@
 //cfg grammar should be in bnf format
 
-use crate::production::Production;
+use std::rc::Rc;
 
-pub type Grammar<AST, Token, TranslatorStack> = Vec<Production<AST, Token, TranslatorStack>>;
+use indexmap::{IndexMap, IndexSet};
+
+use crate::{production::Production, symbol::Symbol};
+
+#[derive(Debug, Clone)]
+pub struct Grammar<AST, Token, TranslatorStack> {
+    pub non_terminals: IndexSet<Rc<Symbol>>,
+    pub terminals: IndexSet<Rc<Symbol>>,
+    pub start: Rc<Symbol>,
+    pub productions: IndexSet<Rc<Production<AST, Token, TranslatorStack>>>,
+    pub production_head_map:
+        IndexMap<String, IndexSet<Rc<Production<AST, Token, TranslatorStack>>>>,
+}
+
+impl<AST, Token, TranslatorStack> Grammar<AST, Token, TranslatorStack> {
+    pub fn new() -> Self {
+        Grammar {
+            non_terminals: IndexSet::new(),
+            terminals: IndexSet::new(),
+            start: Rc::new(Symbol::NONTERMINAL("Start".to_string())),
+            productions: IndexSet::new(),
+            production_head_map: IndexMap::new(),
+        }
+    }
+}
 
 #[macro_export]
 macro_rules! grammar {
     (
         $(
             $head:ident -> $(
-                $([$($terminal:expr),*])?
+                $([$terminal:expr])?
                 $($non_terminal:ident)*
                 $({error:$error:literal})?
                 $({action:|$arg1:ident,$arg2:ident,$arg3:ident,$arg4:ident| $expr:block})?
             )|+
         );+;
     ) => {{
-        let mut grammar = Vec::new();
+        let mut grammar = Grammar::new();
+        let mut non_terminals = indexmap::IndexSet::new();
+        let mut terminals = indexmap::IndexSet::new();
         let augmented_production = Production {
             head: String::from("S'"),
-            body: vec![Symbol::NONTERMINAL(String::from("Start"))],
+            body: vec![std::rc::Rc::new(Symbol::NONTERMINAL(String::from("Start")))],
             error_message: None,
             #[allow(unused_variables)]
             action: Some(Arc::new(|ast, token_stack, tl_stack, errors| {})),
             index: 0
         };
-        grammar.push(augmented_production);
+        grammar.productions.insert(std::rc::Rc::new(augmented_production));
         $({
-            $({let mut body_ : Vec<Symbol> = Vec::new();
-            $($(body_.push(Symbol::TERMINAL($terminal.to_string()));)*)?
-            $(
-                body_.push(Symbol::NONTERMINAL(stringify!($non_terminal).to_string()));
-            )*
+            $({let mut body_ : Vec<std::rc::Rc<Symbol>> = Vec::new();
+                $(
+                    let terminal_ref = std::rc::Rc::new(Symbol::TERMINAL($terminal.to_string()));
+                    terminals.insert(std::rc::Rc::clone(&terminal_ref));
+                    body_.push(std::rc::Rc::clone(&terminal_ref));
+                )?
+                $(
+                    let non_terminal_ref = std::rc::Rc::new(Symbol::NONTERMINAL(stringify!($non_terminal).to_string()));
+                    non_terminals.insert(std::rc::Rc::clone(&non_terminal_ref));
+                    body_.push(std::rc::Rc::clone(&non_terminal_ref));
+                )*
             #[allow(unused_mut)]
             let mut production = Production {
                 head: stringify!($head).to_string(),
                 body: body_,
                 error_message: None,
                 action:None,
-                index: grammar.len()
+                index: grammar.productions.len()
             };
             $(
               if $error.to_string().len() > 0 {
@@ -48,8 +80,10 @@ macro_rules! grammar {
             $(
                 {production.action = Some(Arc::new(|$arg1,$arg2,$arg3,$arg4| $expr))}
             )?
-            grammar.push(production);})+
+            grammar.productions.insert(std::rc::Rc::new(production));})+
         })+
+        grammar.terminals = terminals;
+        grammar.non_terminals = non_terminals;
         grammar
     }}
 }
