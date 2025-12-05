@@ -48,7 +48,7 @@ macro_rules! grammar {
             body: vec![std::rc::Rc::new(Symbol::NONTERMINAL(String::from("Start")))],
             error_message: None,
             #[allow(unused_variables)]
-            action: Some(Arc::new(|ast, token_stack, tl_stack, errors| {})),
+            action: Some(Rc::new(|ast, token_stack, tl_stack, errors| {})),
             index: 0
         };
         grammar.productions.insert(std::rc::Rc::new(augmented_production));
@@ -78,7 +78,7 @@ macro_rules! grammar {
               }
             )?
             $(
-                {production.action = Some(Arc::new(|$arg1,$arg2,$arg3,$arg4| $expr))}
+                {production.action = Some(Rc::new(|$arg1,$arg2,$arg3,$arg4| $expr))}
             )?
             grammar.productions.insert(std::rc::Rc::new(production));})+
         })+

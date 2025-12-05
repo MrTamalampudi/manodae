@@ -1,4 +1,4 @@
-use std::{hash::Hash, rc::Rc, sync::Arc};
+use std::{hash::Hash, rc::Rc};
 
 use crate::{error::ParseError, symbol::Symbol};
 
@@ -9,7 +9,7 @@ pub struct Production<AST, Token, TranslatorStack> {
     pub body: Vec<Rc<Symbol>>,
     pub error_message: Option<String>,
     pub action: Option<
-        Arc<
+        Rc<
             dyn Fn(
                 &mut AST,
                 &mut Vec<Token>,
