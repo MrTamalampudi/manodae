@@ -1,6 +1,7 @@
 #![allow(nonstandard_style)]
 
 pub mod action;
+pub mod codegen;
 pub mod conflict;
 pub mod error;
 pub mod first;
