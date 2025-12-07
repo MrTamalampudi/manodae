@@ -1,5 +1,7 @@
 use std::{hash::Hash, rc::Rc};
 
+use proc_macro2::TokenStream;
+
 use crate::{error::ParseError, symbol::Symbol};
 
 #[derive(Clone)]
@@ -8,6 +10,7 @@ pub struct Production<AST, Token, TranslatorStack> {
     pub head: String,
     pub body: Vec<Rc<Symbol>>,
     pub error_message: Option<String>,
+    pub action_tokens: TokenStream,
     pub action: Option<
         Rc<
             dyn Fn(
@@ -36,7 +39,8 @@ impl<AST, Token, TranslatorStack> std::fmt::Debug for Production<AST, Token, Tra
             .field("body", &self.body)
             .field("error_message", &self.error_message)
             .field("index", &self.index)
-            .finish_non_exhaustive()
+            .field("action", &self.action_tokens.to_string())
+            .finish()
     }
 }
 
