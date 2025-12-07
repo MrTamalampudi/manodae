@@ -1,8 +1,10 @@
 //cfg grammar should be in bnf format
 
-use std::rc::Rc;
+use std::{fmt::Debug, rc::Rc};
 
 use indexmap::{IndexMap, IndexSet};
+use proc_macro2::TokenStream;
+use quote::{quote, ToTokens};
 
 use crate::{production::Production, symbol::Symbol};
 
@@ -12,6 +14,7 @@ pub struct Grammar<AST, Token, TranslatorStack> {
     pub terminals: IndexSet<Rc<Symbol>>,
     pub start: Rc<Symbol>,
     pub productions: IndexSet<Rc<Production<AST, Token, TranslatorStack>>>,
+    //used only when constructing table, no need for parsing
     pub production_head_map:
         IndexMap<String, IndexSet<Rc<Production<AST, Token, TranslatorStack>>>>,
 }
@@ -49,6 +52,7 @@ macro_rules! grammar {
             error_message: None,
             #[allow(unused_variables)]
             action: Some(Rc::new(|ast, token_stack, tl_stack, errors| {})),
+            action_tokens : quote::quote!{Rc::new(|$arg1,$arg2,$arg3,$arg4| {})},
             index: 0
         };
         grammar.productions.insert(std::rc::Rc::new(augmented_production));
@@ -70,6 +74,7 @@ macro_rules! grammar {
                 body: body_,
                 error_message: None,
                 action:None,
+                action_tokens : quote::quote!{Rc::new(|$arg1,$arg2,$arg3,$arg4| {})},
                 index: grammar.productions.len()
             };
             $(
@@ -79,6 +84,7 @@ macro_rules! grammar {
             )?
             $(
                 {production.action = Some(Rc::new(|$arg1,$arg2,$arg3,$arg4| $expr))}
+                {production.action_tokens = quote::quote!{Rc::new(|$arg1,$arg2,$arg3,$arg4| $expr)}}
             )?
             grammar.productions.insert(std::rc::Rc::new(production));})+
         })+
