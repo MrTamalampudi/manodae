@@ -1,4 +1,4 @@
-use std::{cell::RefCell, fmt::Debug, ops::Deref, process::exit, rc::Rc, time::Instant};
+use std::{cell::RefCell, fmt::Debug, ops::Deref, process::exit, rc::Rc};
 
 use indexmap::{IndexMap, IndexSet};
 
