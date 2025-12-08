@@ -1,17 +1,27 @@
-use quote::{quote, ToTokens};
+use proc_macro2::TokenStream;
+use quote::quote;
 
-use crate::item::Item;
+use crate::{codegen::ToTokens, item::Item};
 
 impl<AST, Token, TranslatorStack> ToTokens for Item<AST, Token, TranslatorStack> {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let la = self.lookaheads.clone();
+    fn to_tokens(&self) -> TokenStream {
+        let la: Vec<_> = self
+            .lookaheads
+            .iter()
+            .map(|sym| {
+                let tokens = sym.to_tokens();
+                quote! {Rc::new(#tokens)}
+            })
+            .collect();
+        let production = &self.production.to_tokens();
+        let cursor = &self.cursor;
         let item = quote! {
             Item {
-                production: Rc::new(#self.production),
-                cursor: #self.cursor,
-                lookaheads: vec![#(Rc::new(#la)),*]
+                production: Rc::new(#production),
+                cursor: #cursor,
+                lookaheads: vec![#(#la),*]
             }
         };
-        tokens.extend(item);
+        item
     }
 }

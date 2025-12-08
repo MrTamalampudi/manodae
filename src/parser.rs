@@ -31,8 +31,10 @@ pub struct LR1_Parser<AST, Token, TranslatorStack> {
         Rc<State<AST, Token, TranslatorStack>>,
         IndexMap<Rc<Symbol>, Action<AST, Token, TranslatorStack>>,
     >,
+    //used only when constructing table, no need for parsing
     item_closure_map:
         IndexMap<Item<AST, Token, TranslatorStack>, Vec<Item<AST, Token, TranslatorStack>>>,
+    //used only when constructing table, no need for parsing
     closure_map:
         IndexMap<Vec<Item<AST, Token, TranslatorStack>>, Vec<Item<AST, Token, TranslatorStack>>>,
 }

@@ -14,5 +14,7 @@ pub mod render_table;
 pub mod state;
 pub mod symbol;
 
+pub use codegen::codegen;
+
 #[cfg(test)]
 mod tests;

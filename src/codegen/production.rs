@@ -1,10 +1,10 @@
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::quote;
 
-use crate::production::Production;
+use crate::{codegen::ToTokens, production::Production};
 
 impl<AST, Tokens, TranslatorStack> ToTokens for Production<AST, Tokens, TranslatorStack> {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+    fn to_tokens(&self) -> TokenStream {
         let error_message = match &self.error_message {
             Some(err) => quote! {Some(String::new(#err))},
             None => quote! {None},
@@ -15,17 +15,26 @@ impl<AST, Tokens, TranslatorStack> ToTokens for Production<AST, Tokens, Translat
             self.action_tokens.clone()
         };
         let action_tokens = TokenStream::new();
-        let body = self.body.clone();
+        let body: Vec<_> = self
+            .body
+            .iter()
+            .map(|sym| {
+                let tokens = sym.to_tokens();
+                quote! {Rc::new(#tokens)}
+            })
+            .collect();
+        let index = &self.index;
+        let head = &self.head;
         let production = quote! {
             Production {
-                index: #self.index,
-                head: #self.head,
+                index: #index,
+                head: #head,
                 error_message: #error_message,
                 action_tokens: #action_tokens,
                 action: #action,
-                body: Vec::new([#(Rc::new(#body)),*]),
+                body: Vec::new([#(#body),*]),
             }
         };
-        tokens.extend(production);
+        production
     }
 }

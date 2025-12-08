@@ -50,7 +50,7 @@ macro_rules! grammar {
             error_message: None,
             #[allow(unused_variables)]
             action: Some(Rc::new(|ast, token_stack, tl_stack, errors| {})),
-            action_tokens : quote::quote!{Rc::new(|$arg1,$arg2,$arg3,$arg4| {})},
+            action_tokens : quote::quote!{Rc::new(|ast, token_stack, tl_stack, errors| {})},
             index: 0
         };
         grammar.productions.insert(std::rc::Rc::new(augmented_production));
@@ -72,7 +72,7 @@ macro_rules! grammar {
                 body: body_,
                 error_message: None,
                 action:None,
-                action_tokens : quote::quote!{Rc::new(|$arg1,$arg2,$arg3,$arg4| {})},
+                action_tokens : quote::quote!{Rc::new(|ast, token_stack, tl_stack, errors| {})},
                 index: grammar.productions.len()
             };
             $(
