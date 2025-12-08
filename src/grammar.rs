@@ -3,8 +3,6 @@
 use std::{fmt::Debug, rc::Rc};
 
 use indexmap::{IndexMap, IndexSet};
-use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
 
 use crate::{production::Production, symbol::Symbol};
 

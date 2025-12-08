@@ -1,5 +1,3 @@
-use std::{ops::Deref, os::unix::net::Incoming};
-
 use quote::{quote, ToTokens};
 
 use crate::state::State;
