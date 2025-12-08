@@ -37,7 +37,7 @@ impl<AST, Token, TranslatorStack> ToTokens for Grammar<AST, Token, TranslatorSta
         let production_head_map = quote! {IndexMap::new()};
 
         let grammar = quote! {
-            Grammar {
+            G {
                 non_terminals:#nt,
                 terminals:#t,
                 start:#start,

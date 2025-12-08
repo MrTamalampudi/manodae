@@ -189,13 +189,7 @@ where
             self.closure_map
                 .insert(transition_productions.clone(), new_items.clone());
         }
-        let state = State::new(
-            0,
-            new_items,
-            transition_productions,
-            IndexMap::new(),
-            vec![],
-        );
+        let state = State::new(0, new_items, transition_productions);
         Some(Rc::new(RefCell::new(state)))
     }
 

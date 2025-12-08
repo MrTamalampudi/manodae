@@ -85,7 +85,7 @@ impl<AST, Token, TranslatorStack> ToTokens for LR1_Parser<AST, Token, Translator
             .collect();
         let grammar = self.grammar.to_tokens();
         let parser = quote! {
-            Parser {
+            L {
                 grammar: #grammar,
                 LR1_automata: vec![#(#LR1_automata),*],
                 follow_set: IndexMap::from([#(#follow_set),*]),

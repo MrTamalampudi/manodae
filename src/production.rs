@@ -23,6 +23,35 @@ pub struct Production<AST, Token, TranslatorStack> {
     >,
 }
 
+impl<AST, Token, TranslatorStack> Production<AST, Token, TranslatorStack> {
+    pub fn n(
+        index: usize,
+        head: String,
+        body: Vec<Rc<Symbol>>,
+        error_message: Option<String>,
+        action_tokens: TokenStream,
+        action: Option<
+            Rc<
+                dyn Fn(
+                    &mut AST,
+                    &mut Vec<Token>,
+                    &mut Vec<TranslatorStack>,
+                    &mut Vec<ParseError<Token>>,
+                ),
+            >,
+        >,
+    ) -> Self {
+        Production {
+            index,
+            head,
+            body,
+            error_message,
+            action_tokens,
+            action,
+        }
+    }
+}
+
 impl<AST, Token, TranslatorStack> Hash for Production<AST, Token, TranslatorStack> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.index.hash(state);

@@ -54,15 +54,13 @@ where
         index: usize,
         items: Vec<Item<AST, Token, TranslatorStack>>,
         transition_productions: Vec<Item<AST, Token, TranslatorStack>>,
-        outgoing: IndexMap<Rc<Symbol>, Rc<RefCell<State<AST, Token, TranslatorStack>>>>,
-        incoming: Vec<Rc<RefCell<State<AST, Token, TranslatorStack>>>>,
     ) -> State<AST, Token, TranslatorStack> {
         State {
             index,
             items,
             transition_productions,
-            outgoing,
-            incoming,
+            outgoing: IndexMap::new(),
+            incoming: vec![],
         }
     }
 }

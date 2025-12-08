@@ -26,14 +26,14 @@ impl<AST, Tokens, TranslatorStack> ToTokens for Production<AST, Tokens, Translat
         let index = &self.index;
         let head = &self.head;
         let production = quote! {
-            Production {
-                index: #index,
-                head: #head,
-                error_message: #error_message,
-                action_tokens: #action_tokens,
-                action: #action,
-                body: Vec::new([#(#body),*]),
-            }
+            P::n(
+                #index,
+                #head,
+                Vec::new([#(#body),*]),
+                #error_message,
+                #action_tokens,
+                #action,
+            )
         };
         production
     }

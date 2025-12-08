@@ -16,11 +16,11 @@ impl<AST, Token, TranslatorStack> ToTokens for Item<AST, Token, TranslatorStack>
         let production = &self.production.to_tokens();
         let cursor = &self.cursor;
         let item = quote! {
-            Item {
-                production: Rc::new(#production),
-                cursor: #cursor,
-                lookaheads: vec![#(#la),*]
-            }
+            I::n(
+                Rc::new(#production),
+                #cursor,
+                vec![#(#la),*]
+            )
         };
         item
     }

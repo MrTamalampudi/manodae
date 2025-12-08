@@ -8,14 +8,14 @@ impl<AST, Token, TranslatorStack> ToTokens for Action<AST, Token, TranslatorStac
         match self {
             Action::SHIFT(state) => {
                 let state = state.to_tokens();
-                quote! {Action::SHIFT(Rc::new(#state))}
+                quote! {A::SHIFT(Rc::new(#state))}
             }
             Action::REDUCE(production) => {
                 let production = production.to_tokens();
-                quote! {Action::REDUCE(Rc::new(#production))}
+                quote! {A::REDUCE(Rc::new(#production))}
             }
-            Action::ERROR(err) => quote! {Action::ERROR(String::new(#err))},
-            Action::ACCEPT => quote! {Action::ACCEPT},
+            Action::ERROR(err) => quote! {A::ERROR(String::new(#err))},
+            Action::ACCEPT => quote! {A::ACCEPT},
         }
     }
 }

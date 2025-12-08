@@ -16,8 +16,14 @@ mod symbol;
 pub fn codegen<AST, Token, TranslatorStack>(parser: LR1_Parser<AST, Token, TranslatorStack>) {
     let parser = parser.to_tokens();
     let code = quote! {
-        use manodae::parser::LR1_Parser;
-        use manodae::symbol::Symbol;
+        use manodae::parser::LR1_Parser as L;
+        use manodae::symbol::Symbol as C;
+        use manodae::state::State as S;
+        use manodae::item::Item as I;
+        use manodae::grammar::Grammar as G;
+        use manodae::action::Action as A;
+        use manodae::production::Production as P;
+
         fn get_parser() -> LR1_Parser<AST, Token, TranslatorStack> {
             let parser = #parser
         }

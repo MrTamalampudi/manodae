@@ -30,6 +30,17 @@ impl<AST, Token, TranslatorStack> Hash for Item<AST, Token, TranslatorStack> {
 }
 
 impl<AST, Token, TranslatorStack> Item<AST, Token, TranslatorStack> {
+    pub fn n(
+        production: Rc<Production<AST, Token, TranslatorStack>>,
+        cursor: u8,
+        lookaheads: Vec<Rc<Symbol>>,
+    ) -> Self {
+        Item {
+            production,
+            cursor,
+            lookaheads,
+        }
+    }
     pub fn next_symbol(&self) -> Option<&Rc<Symbol>> {
         if self.cursor == self.production.body.len() as u8 {
             None
