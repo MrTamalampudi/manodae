@@ -11,25 +11,23 @@ use crate::{
     item::{Item, ItemVecExtension},
     production::Production,
     state::{State, StateVecExtension},
-    symbol::Symbol,
+    symbol::{Symbol, SymbolId, AUGMENT_START_SYMBOL_ID, EOF_SYMBOL_ID},
 };
-
-const AUGMENTED_PRODUCTION_HEAD: &'static str = "S'";
 
 #[derive(Debug, Clone)]
 pub struct LR1_Parser<AST, Token, TranslatorStack> {
     pub grammar: Grammar<AST, Token, TranslatorStack>,
     pub LR1_automata: Vec<Rc<State<AST, Token, TranslatorStack>>>,
-    pub follow_set: IndexMap<Rc<Symbol>, IndexSet<Rc<Symbol>>>,
-    pub first_set: IndexMap<Rc<Symbol>, IndexSet<Rc<Symbol>>>,
+    pub follow_set: IndexMap<SymbolId, IndexSet<SymbolId>>,
+    pub first_set: IndexMap<SymbolId, IndexSet<SymbolId>>,
     pub conflicts: bool,
     pub goto: IndexMap<
         Rc<State<AST, Token, TranslatorStack>>,
-        IndexMap<Rc<Symbol>, Rc<State<AST, Token, TranslatorStack>>>,
+        IndexMap<SymbolId, Rc<State<AST, Token, TranslatorStack>>>,
     >,
     pub action: IndexMap<
         Rc<State<AST, Token, TranslatorStack>>,
-        IndexMap<Rc<Symbol>, Action<AST, Token, TranslatorStack>>,
+        IndexMap<SymbolId, Action<AST, Token, TranslatorStack>>,
     >,
     //used only when constructing table, no need for parsing
     item_closure_map:
@@ -54,13 +52,13 @@ where
         let follow_set = compute_follow_set(&grammar);
 
         let mut production_head_map: IndexMap<
-            String,
+            SymbolId,
             IndexSet<Rc<Production<AST, Token, TranslatorStack>>>,
         > = IndexMap::new();
 
         grammar.productions.iter().for_each(|production| {
             production_head_map
-                .entry(production.head.clone())
+                .entry(production.head)
                 .and_modify(|entry| {
                     entry.insert(Rc::clone(production));
                 })
@@ -115,18 +113,15 @@ where
                         continue;
                     }
                     let B = B.unwrap();
-                    if B.is_terminal() {
+                    if self.grammar.symbols.terminal(B) {
                         continue;
                     }
-                    let b_productions: &IndexSet<_> = self
-                        .grammar
-                        .production_head_map
-                        .get(&B.to_string())
-                        .unwrap();
+                    let b_productions: &IndexSet<_> =
+                        self.grammar.production_head_map.get(B).unwrap();
                     let mut lookaheads = Vec::new();
                     for first in first_of.iter() {
                         for terminal_b in self.first_set.get(first).unwrap().iter() {
-                            lookaheads.push(Rc::clone(terminal_b));
+                            lookaheads.push(*terminal_b);
                         }
                     }
                     let mut ni = vec![];
@@ -162,7 +157,7 @@ where
     fn goto(
         &mut self,
         state_: &Rc<RefCell<State<AST, Token, TranslatorStack>>>,
-        symbol: &Rc<Symbol>,
+        symbol: SymbolId,
     ) -> Option<Rc<RefCell<State<AST, Token, TranslatorStack>>>> {
         let mut new_items = vec![];
         for item in state_.borrow().items.iter() {
@@ -170,7 +165,7 @@ where
             if item_symbol.is_none() {
                 continue;
             }
-            if symbol != item_symbol.unwrap() {
+            if symbol != *item_symbol.unwrap() {
                 continue;
             }
             let mut item = item.clone();
@@ -207,7 +202,7 @@ where
         let augmented_item: Item<AST, Token, TranslatorStack> = Item {
             production: Rc::clone(self.grammar.productions.first().unwrap()),
             cursor: 0,
-            lookaheads: vec![Rc::new(Symbol::TERMINAL(String::from("EOF")))],
+            lookaheads: vec![EOF_SYMBOL_ID],
         };
         let mut S0_items = vec![augmented_item];
         self.clousure(&mut S0_items);
@@ -222,8 +217,8 @@ where
         let mut states_count = 0;
         let mut states_iterated_count = 0;
         let mut symbols = vec![];
-        symbols.extend(self.grammar.non_terminals.clone());
-        symbols.extend(self.grammar.terminals.clone());
+        symbols.extend(self.grammar.symbols.non_terminals.clone());
+        symbols.extend(self.grammar.symbols.terminals.clone());
         while LR1_automata.len().ne(&states_count) {
             states_count = LR1_automata.len();
             let mut new_state = vec![];
@@ -232,20 +227,17 @@ where
                 let mut goto_map = IndexMap::new();
                 for symbol in symbols.iter() {
                     let items = state.borrow().items.clone();
-                    let es = goto_set.get(&(items.clone(), Rc::clone(symbol)));
+                    let es = goto_set.get(&(items.clone(), symbol));
                     if let Some(es) = es {
-                        goto_map.insert(Rc::clone(symbol), Rc::clone(es));
+                        goto_map.insert(*symbol, Rc::clone(es));
                     } else {
-                        let goto_productions_state = self.goto(&state, symbol);
+                        let goto_productions_state = self.goto(&state, *symbol);
                         if goto_productions_state.is_none() {
                             continue;
                         }
                         let goto_productions_state = goto_productions_state.unwrap();
-                        goto_set.insert(
-                            (items, Rc::clone(symbol)),
-                            Rc::clone(&goto_productions_state),
-                        );
-                        goto_map.insert(Rc::clone(symbol), Rc::clone(&goto_productions_state));
+                        goto_set.insert((items, symbol), Rc::clone(&goto_productions_state));
+                        goto_map.insert(*symbol, Rc::clone(&goto_productions_state));
                         new_state.push(Rc::clone(&goto_productions_state));
                     }
                 }
@@ -296,12 +288,12 @@ where
 
         let mut action: IndexMap<
             Rc<State<AST, Token, TranslatorStack>>,
-            IndexMap<Rc<Symbol>, Action<AST, Token, TranslatorStack>>,
+            IndexMap<SymbolId, Action<AST, Token, TranslatorStack>>,
         > = IndexMap::new();
 
         let mut goto: IndexMap<
             Rc<State<AST, Token, TranslatorStack>>,
-            IndexMap<Rc<Symbol>, Rc<State<AST, Token, TranslatorStack>>>,
+            IndexMap<SymbolId, Rc<State<AST, Token, TranslatorStack>>>,
         > = IndexMap::new();
 
         let mut transition_prod_map: IndexMap<
@@ -319,21 +311,16 @@ where
             for item in state.items.iter() {
                 let next_symbol = item.next_symbol();
                 if next_symbol.is_none() {
-                    if item
-                        .production
-                        .head
-                        .ne(&AUGMENTED_PRODUCTION_HEAD.to_string())
-                    {
+                    if item.production.head.ne(&AUGMENT_START_SYMBOL_ID) {
                         let mut map = IndexMap::new();
                         item.lookaheads.iter().for_each(|lookahead| {
-                            map.insert(lookahead.clone(), Action::REDUCE(item.production.clone()));
+                            map.insert(*lookahead, Action::REDUCE(item.production.clone()));
                         });
                         action.entry(state.clone()).insert_entry(map);
                     } else {
-                        action.entry(state.clone()).insert_entry(IndexMap::from([(
-                            Rc::new(Symbol::TERMINAL(String::from("EOF"))),
-                            Action::ACCEPT,
-                        )]));
+                        action
+                            .entry(state.clone())
+                            .insert_entry(IndexMap::from([(EOF_SYMBOL_ID, Action::ACCEPT)]));
                     }
                     continue;
                 }
@@ -345,7 +332,7 @@ where
                     continue;
                 }
                 let item_goto_state = item_goto_state.unwrap();
-                if let Symbol::TERMINAL(_) = symbol.deref() {
+                if self.grammar.symbols.terminal(symbol) {
                     action
                         .entry(state.clone())
                         .and_modify(|map| {
@@ -359,7 +346,7 @@ where
                             Action::SHIFT(Rc::new(item_goto_state.borrow().clone())),
                         )]));
                 }
-                if let Symbol::NONTERMINAL(_) = symbol.deref() {
+                if self.grammar.symbols.non_terminal(symbol) {
                     goto.entry(state.clone())
                         .and_modify(|map| {
                             map.insert(symbol.clone(), Rc::new(item_goto_state.borrow().clone()));
@@ -425,7 +412,11 @@ where
             S0 = stack.last().unwrap();
             //every state will be in action_map so unwrap
             let action_map = self.action.get(S0).unwrap();
-            if let Some(action) = action_map.get(&current_input_symbol) {
+            let symbol_id = self.grammar.symbols.reverse_lookup(&current_input_symbol);
+            if symbol_id.is_none() {
+                panic!("symbol not found");
+            }
+            if let Some(action) = action_map.get(&symbol_id.unwrap()) {
                 match action {
                     Action::SHIFT(state) => {
                         stack.push(Rc::clone(state));
@@ -450,8 +441,7 @@ where
                         stack.truncate(stack.len() - production.body_len());
                         let stack_top = stack.last().unwrap();
                         let goto_map = self.goto.get(stack_top).unwrap();
-                        let goto_stack =
-                            goto_map.get(&Symbol::NONTERMINAL(production.head.to_string()));
+                        let goto_stack = goto_map.get(&production.head);
                         if let Some(goto_stack) = goto_stack {
                             stack.push(Rc::clone(goto_stack));
                         }
@@ -481,12 +471,10 @@ where
                     }
                     S0 = so_o.unwrap();
                     let goto_map = self.goto.get(S0).unwrap();
-                    let keys: Vec<Rc<Symbol>> = goto_map.clone().into_keys().collect();
+                    let keys: Vec<SymbolId> = goto_map.clone().into_keys().collect();
                     let mut contains = false;
                     for item in deduced_items.iter() {
-                        if keys
-                            .contains(&Rc::new(Symbol::NONTERMINAL(item.production.head.clone())))
-                        {
+                        if keys.contains(&item.production.head.clone()) {
                             contains = true;
                             deduced_production = Some(item.production.clone());
                             break;
@@ -503,12 +491,14 @@ where
                 }
                 let error_production_follow_set = self
                     .follow_set
-                    .get(&Symbol::NONTERMINAL(
-                        deduced_production.clone().unwrap().head.clone(),
-                    ))
+                    .get(&deduced_production.clone().unwrap().head.clone())
                     .unwrap();
                 loop {
-                    if error_production_follow_set.contains(&current_input_symbol) {
+                    let symbol_id = self.grammar.symbols.reverse_lookup(&current_input_symbol);
+                    if symbol_id.is_none() {
+                        panic!("symbol not found");
+                    }
+                    if error_production_follow_set.contains(&symbol_id.unwrap()) {
                         if deduced_production.clone().unwrap().error_message.is_some() {
                             //let a = deduced_production.unwrap().clone(); todo
                             error_message = "SOme".to_string();
@@ -547,7 +537,7 @@ where
         state: &State<AST, Token, TranslatorStack>,
     ) -> String {
         let action_map = self.action.get(state).unwrap();
-        let keys: Vec<Rc<Symbol>> = action_map.clone().into_keys().collect();
+        let keys: Vec<SymbolId> = action_map.clone().into_keys().collect();
         let action_keys: Vec<String> = keys.iter().map(|symbol| symbol.to_string()).collect();
         String::from("Expected ") + join_either_or(action_keys).as_str()
     }

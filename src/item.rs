@@ -2,13 +2,16 @@ use std::{fmt::Debug, hash::Hash, rc::Rc};
 
 use indexmap::IndexMap;
 
-use crate::{production::Production, symbol::Symbol};
+use crate::{
+    production::Production,
+    symbol::{SymbolId, AUGMENT_START_SYMBOL_ID},
+};
 
 #[derive(Debug, Clone)]
 pub struct Item<AST, Token, TranslatorStack> {
     pub production: Rc<Production<AST, Token, TranslatorStack>>,
     pub cursor: u8,
-    pub lookaheads: Vec<Rc<Symbol>>,
+    pub lookaheads: Vec<SymbolId>,
 }
 
 impl<AST, Token, TranslatorStack> PartialEq for Item<AST, Token, TranslatorStack> {
@@ -33,7 +36,7 @@ impl<AST, Token, TranslatorStack> Item<AST, Token, TranslatorStack> {
     pub fn n(
         production: Rc<Production<AST, Token, TranslatorStack>>,
         cursor: u8,
-        lookaheads: Vec<Rc<Symbol>>,
+        lookaheads: Vec<SymbolId>,
     ) -> Self {
         Item {
             production,
@@ -41,7 +44,7 @@ impl<AST, Token, TranslatorStack> Item<AST, Token, TranslatorStack> {
             lookaheads,
         }
     }
-    pub fn next_symbol(&self) -> Option<&Rc<Symbol>> {
+    pub fn next_symbol(&self) -> Option<&SymbolId> {
         if self.cursor == self.production.body.len() as u8 {
             None
         } else {
@@ -52,7 +55,7 @@ impl<AST, Token, TranslatorStack> Item<AST, Token, TranslatorStack> {
         self.cursor += 1;
     }
     pub fn is_augment_item(&self) -> bool {
-        self.production.head == String::from("S'")
+        self.production.head == AUGMENT_START_SYMBOL_ID
     }
 
     pub fn is_eq(&self, other: &Item<AST, Token, TranslatorStack>) -> bool {

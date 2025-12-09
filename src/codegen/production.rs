@@ -24,7 +24,7 @@ impl<AST, Tokens, TranslatorStack> ToTokens for Production<AST, Tokens, Translat
             })
             .collect();
         let index = &self.index;
-        let head = &self.head;
+        let head = &self.head.to_tokens();
         let production = quote! {
             P::n(
                 #index,

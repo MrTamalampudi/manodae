@@ -1,31 +1,32 @@
-use std::{ops::Deref, rc::Rc};
-
 use indexmap::{IndexMap, IndexSet};
 
-use crate::{grammar::Grammar, symbol::Symbol};
+use crate::{
+    grammar::Grammar,
+    symbol::{SymbolId, EOF_SYMBOL_ID},
+};
 
 pub fn compute_first_set<AST, Token, TranslatorStack>(
-    productions: &Grammar<AST, Token, TranslatorStack>,
-) -> IndexMap<Rc<Symbol>, IndexSet<Rc<Symbol>>> {
-    let mut first_map: IndexMap<Rc<Symbol>, IndexSet<Rc<Symbol>>> = IndexMap::new();
-    let mut first_map_: IndexMap<Rc<Symbol>, IndexSet<Rc<Symbol>>> = IndexMap::new();
-    let mut productions_hashmap: IndexMap<Rc<Symbol>, Vec<Vec<Rc<Symbol>>>> = IndexMap::new();
+    grammar: &Grammar<AST, Token, TranslatorStack>,
+) -> IndexMap<SymbolId, IndexSet<SymbolId>> {
+    let mut first_map: IndexMap<SymbolId, IndexSet<SymbolId>> = IndexMap::new();
+    let mut first_map_: IndexMap<SymbolId, IndexSet<SymbolId>> = IndexMap::new();
+    let mut productions_hashmap: IndexMap<SymbolId, Vec<Vec<SymbolId>>> = IndexMap::new();
 
-    let mut symbols = vec![Rc::new(Symbol::TERMINAL(String::from("EOF")))];
-    symbols.extend(productions.non_terminals.clone());
-    symbols.extend(productions.terminals.clone());
+    let mut symbols = vec![EOF_SYMBOL_ID];
+    symbols.extend(grammar.symbols.terminals.clone());
+    symbols.extend(grammar.symbols.non_terminals.clone());
 
     symbols.iter().for_each(|symbol| {
         first_map.insert(symbol.clone(), IndexSet::new());
-        if let Symbol::NONTERMINAL(_) = symbol.deref() {
+        if grammar.symbols.non_terminal(symbol) {
             productions_hashmap.insert(symbol.clone(), Vec::new());
         }
     });
 
-    for production in productions.productions.iter() {
-        let p = productions_hashmap.get_mut(&Symbol::NONTERMINAL(production.head.clone()));
-        if let Some(bodies) = p {
-            bodies.push(production.body.clone());
+    for production in grammar.productions.iter() {
+        let p = productions_hashmap.get_mut(&production.head);
+        if let Some(body) = p {
+            body.push(production.body.clone());
         }
     }
 
@@ -33,28 +34,28 @@ pub fn compute_first_set<AST, Token, TranslatorStack>(
         first_map_.clear();
         first_map_ = first_map.clone();
         for symbol in symbols.iter() {
-            match symbol.deref() {
-                Symbol::TERMINAL(_) => {
+            match symbol {
+                x if grammar.symbols.terminal(x) => {
                     first_map.insert(symbol.clone(), IndexSet::from([symbol.clone()]));
                 }
-                Symbol::NONTERMINAL(_) => {
+                x if grammar.symbols.non_terminal(x) => {
                     let p = productions_hashmap.get(symbol).unwrap();
                     p.iter().for_each(|body| {
                         if !body.is_empty() {
                             let first = body.first().unwrap();
-                            let set_ = match first.deref() {
-                                Symbol::TERMINAL(_) => IndexSet::from([first.clone()]),
-                                Symbol::NONTERMINAL(_) => {
-                                    let a: IndexSet<Rc<Symbol>> =
-                                        first_map.get(first).unwrap().iter().cloned().collect();
-                                    a
+                            let set_ = match first {
+                                x if grammar.symbols.terminal(x) => IndexSet::from([*x]),
+                                x if grammar.symbols.non_terminal(x) => {
+                                    first_map.get(first).unwrap().iter().cloned().collect()
                                 }
+                                _ => return,
                             };
                             let set = first_map.get_mut(symbol).unwrap();
                             set.extend(set_);
                         }
                     });
                 }
+                _ => {}
             }
         }
     }

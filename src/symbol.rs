@@ -1,6 +1,12 @@
-use std::{fmt::Debug, hash::Hash};
+use std::{
+    fmt::{Debug, Display},
+    hash::Hash,
+};
 
 use indexmap::IndexMap;
+use quote::quote;
+
+use crate::codegen::ToTokens;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Symbol {
@@ -33,24 +39,45 @@ impl From<&Symbol> for String {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub struct SymbolId(usize);
+pub struct SymbolId(pub usize);
+
+impl ToTokens for SymbolId {
+    fn to_tokens(&self) -> proc_macro2::TokenStream {
+        let id = self.0;
+        quote! {SID(#id)}
+    }
+}
+
+impl Display for SymbolId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("SymbolId {}", self.0))
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Symbols {
     map: IndexMap<Symbol, SymbolId>,
     vec: Vec<Symbol>,
-    terminals: Vec<SymbolId>,
-    non_terminals: Vec<SymbolId>,
+    pub terminals: Vec<SymbolId>,
+    pub non_terminals: Vec<SymbolId>,
 }
+
+pub(crate) const AUGMENT_START_SYMBOL_ID: SymbolId = SymbolId(0);
+pub(crate) const EOF_SYMBOL_ID: SymbolId = SymbolId(1);
+pub(crate) const START_SYMBOL_ID: SymbolId = SymbolId(2);
 
 impl Symbols {
     pub fn new() -> Symbols {
-        Symbols {
+        let mut symbols = Symbols {
             map: IndexMap::new(),
             vec: vec![],
             terminals: vec![],
             non_terminals: vec![],
-        }
+        };
+        symbols.intern(Symbol::NONTERMINAL(String::from("S'")));
+        symbols.intern(Symbol::TERMINAL(String::from("EOF")));
+        symbols.intern(Symbol::NONTERMINAL("Start".to_string()));
+        symbols
     }
     pub fn intern(&mut self, symbol: Symbol) -> SymbolId {
         if let Some(&id) = self.map.get(&symbol) {
@@ -79,12 +106,12 @@ impl Symbols {
 
     #[inline]
     /// returns true if the id is terminal else false
-    pub fn terminal(&self, id: SymbolId) -> bool {
-        self.terminals.contains(&id)
+    pub fn terminal(&self, id: &SymbolId) -> bool {
+        self.terminals.contains(id)
     }
     #[inline]
     /// returns true if the id is non_terminal else false
-    pub fn non_terminal(&self, id: SymbolId) -> bool {
-        self.non_terminals.contains(&id)
+    pub fn non_terminal(&self, id: &SymbolId) -> bool {
+        self.non_terminals.contains(id)
     }
 }

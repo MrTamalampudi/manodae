@@ -10,7 +10,7 @@ use indexmap::IndexMap;
 
 use crate::{
     item::{Item, ItemVecExtension},
-    symbol::Symbol,
+    symbol::SymbolId,
 };
 
 #[derive(Debug, Clone)]
@@ -18,7 +18,7 @@ pub struct State<AST, Token, TranslatorStack> {
     pub index: usize,
     pub items: Vec<Item<AST, Token, TranslatorStack>>,
     pub transition_productions: Vec<Item<AST, Token, TranslatorStack>>,
-    pub outgoing: IndexMap<Rc<Symbol>, Rc<RefCell<State<AST, Token, TranslatorStack>>>>,
+    pub outgoing: IndexMap<SymbolId, Rc<RefCell<State<AST, Token, TranslatorStack>>>>,
     pub incoming: Vec<Rc<RefCell<State<AST, Token, TranslatorStack>>>>,
 }
 

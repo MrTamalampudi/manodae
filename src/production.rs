@@ -2,13 +2,16 @@ use std::{hash::Hash, rc::Rc};
 
 use proc_macro2::TokenStream;
 
-use crate::{error::ParseError, symbol::Symbol};
+use crate::{
+    error::ParseError,
+    symbol::{SymbolId, AUGMENT_START_SYMBOL_ID},
+};
 
 #[derive(Clone)]
 pub struct Production<AST, Token, TranslatorStack> {
     pub index: usize,
-    pub head: String,
-    pub body: Vec<Rc<Symbol>>,
+    pub head: SymbolId,
+    pub body: Vec<SymbolId>,
     pub error_message: Option<String>,
     pub action_tokens: TokenStream,
     pub action: Option<
@@ -26,8 +29,8 @@ pub struct Production<AST, Token, TranslatorStack> {
 impl<AST, Token, TranslatorStack> Production<AST, Token, TranslatorStack> {
     pub fn n(
         index: usize,
-        head: String,
-        body: Vec<Rc<Symbol>>,
+        head: SymbolId,
+        body: Vec<SymbolId>,
         error_message: Option<String>,
         action_tokens: TokenStream,
         action: Option<
@@ -86,7 +89,7 @@ impl<AST, Token, TranslatorStack> Eq for Production<AST, Token, TranslatorStack>
 
 impl<AST, Token, TranslatorStack> Production<AST, Token, TranslatorStack> {
     pub fn is_augmented_production(&self) -> bool {
-        self.head == String::from("S'")
+        self.head == AUGMENT_START_SYMBOL_ID
     }
 
     pub fn body_len(&self) -> usize {

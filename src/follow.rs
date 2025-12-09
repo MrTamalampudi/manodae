@@ -1,35 +1,37 @@
-use std::{ops::Deref, rc::Rc};
+use std::rc::Rc;
 
 use indexmap::{IndexMap, IndexSet};
 
-use crate::{first::compute_first_set, grammar::Grammar, production::Production, symbol::Symbol};
+use crate::{
+    first::compute_first_set,
+    grammar::Grammar,
+    production::Production,
+    symbol::{SymbolId, AUGMENT_START_SYMBOL_ID, EOF_SYMBOL_ID},
+};
 
 pub fn compute_follow_set<AST, Token, TranslatorStack>(
     grammar: &Grammar<AST, Token, TranslatorStack>,
-) -> IndexMap<Rc<Symbol>, IndexSet<Rc<Symbol>>> {
-    let mut follow_map: IndexMap<Rc<Symbol>, IndexSet<Rc<Symbol>>> = IndexMap::new();
+) -> IndexMap<SymbolId, IndexSet<SymbolId>> {
+    let mut follow_map: IndexMap<SymbolId, IndexSet<SymbolId>> = IndexMap::new();
 
     //populate with empty vectors
-    grammar.non_terminals.iter().for_each(|symbol| {
-        follow_map.insert(Rc::clone(symbol), IndexSet::new());
+    grammar.symbols.non_terminals.iter().for_each(|symbol| {
+        follow_map.insert(*symbol, IndexSet::new());
     });
 
     let augment_production: Option<&Rc<Production<AST, Token, TranslatorStack>>> = grammar
         .productions
         .iter()
-        .filter(|prod| prod.head.eq(&String::from("S'")))
+        .filter(|prod| prod.head.eq(&AUGMENT_START_SYMBOL_ID))
         .next();
 
     match augment_production {
         Some(prod) => {
             let start = prod.body.first().unwrap();
-            match start.deref() {
+            match start {
                 //eofff
-                Symbol::NONTERMINAL(_) => {
-                    follow_map.insert(
-                        start.clone(),
-                        IndexSet::from([Rc::new(Symbol::TERMINAL(String::from("EOF")))]),
-                    );
+                x if grammar.symbols.non_terminal(x) => {
+                    follow_map.insert(start.clone(), IndexSet::from([EOF_SYMBOL_ID]));
                 }
                 _ => {}
             };
@@ -41,14 +43,14 @@ pub fn compute_follow_set<AST, Token, TranslatorStack>(
 
     //A -> a B D , then everything in First(D) is in Follow(B)
     //this loop implements above def
-    for non_terminal in grammar.non_terminals.iter() {
+    for non_terminal in grammar.symbols.non_terminals.iter() {
         for production in grammar.productions.iter() {
-            let with_indexes: Vec<(usize, &Rc<Symbol>)> = production
+            let with_indexes: Vec<(usize, SymbolId)> = production
                 .body
                 .iter()
                 .enumerate()
                 .filter(|(_, symbol)| symbol.eq(&non_terminal))
-                .map(|(index, symbol)| (index, symbol))
+                .map(|(index, symbol)| (index, *symbol))
                 .collect();
 
             //not so good logic but hope it works
@@ -69,7 +71,7 @@ pub fn compute_follow_set<AST, Token, TranslatorStack>(
 
     //A->aB then everything in  Follow(A) is in Follow(B)
     loop {
-        let follow_count_func = |follow_map: &IndexMap<Rc<Symbol>, IndexSet<Rc<Symbol>>>| {
+        let follow_count_func = |follow_map: &IndexMap<SymbolId, IndexSet<SymbolId>>| {
             follow_map
                 .values()
                 .flat_map(|token_types| token_types)
@@ -78,15 +80,14 @@ pub fn compute_follow_set<AST, Token, TranslatorStack>(
         let follow_map_count_before = follow_count_func(&follow_map);
 
         for production in grammar.productions.iter() {
-            if production.head.eq(&String::from("S'")) {
+            if production.head.eq(&AUGMENT_START_SYMBOL_ID) {
                 continue;
             } else {
                 let last_symbol = production.body.last().unwrap();
-                let follow_head =
-                    match follow_map.get(&Symbol::NONTERMINAL(production.head.clone())) {
-                        Some(set) => set.clone(),
-                        None => continue,
-                    };
+                let follow_head = match follow_map.get(&production.head) {
+                    Some(set) => set.clone(),
+                    None => continue,
+                };
                 follow_map
                     .entry(last_symbol.clone())
                     .and_modify(|token_types| token_types.extend(follow_head));
