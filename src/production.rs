@@ -1,12 +1,15 @@
 use std::{hash::Hash, rc::Rc};
 
+use indexmap::IndexMap;
 use proc_macro2::TokenStream;
 
 use crate::{
     error::ParseError,
-    symbol::{SymbolId, AUGMENT_START_SYMBOL_ID},
+    interner::Interner,
+    symbol::{SymbolId, AUGMENT_START_SYMBOL_ID, START_SYMBOL_ID},
 };
 
+///A production is uniquely identified by its head,body,error_message,index
 #[derive(Clone)]
 pub struct Production<AST, Token, TranslatorStack> {
     pub index: usize,
@@ -94,5 +97,69 @@ impl<AST, Token, TranslatorStack> Production<AST, Token, TranslatorStack> {
 
     pub fn body_len(&self) -> usize {
         self.body.len()
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct ProductionId(pub usize);
+
+pub(crate) const AUGMENT_PRODUCTION_ID: ProductionId = ProductionId(0);
+
+#[derive(Debug, Clone)]
+pub struct Productions<AST, Token, TranslatorStack> {
+    pub map: IndexMap<Production<AST, Token, TranslatorStack>, ProductionId>,
+    pub vec: Vec<Production<AST, Token, TranslatorStack>>,
+}
+
+impl<AST, Token, TranslatorStack> Productions<AST, Token, TranslatorStack>
+where
+    AST: Clone,
+    Token: Clone,
+    TranslatorStack: Clone,
+{
+    pub fn new() -> Self {
+        let mut productions = Productions {
+            map: IndexMap::new(),
+            vec: vec![],
+        };
+        let augmented_production = Production {
+            head: AUGMENT_START_SYMBOL_ID,
+            body: vec![START_SYMBOL_ID],
+            error_message: None,
+            #[allow(unused_variables)]
+            action: Some(Rc::new(|ast, token_stack, tl_stack, errors| {})),
+            action_tokens: quote::quote! {Rc::new(|ast, token_stack, tl_stack, errors| {})},
+            index: 0,
+        };
+        productions.intern(augmented_production);
+        productions
+    }
+}
+
+impl<AST, Token, TranslatorStack> Interner for Productions<AST, Token, TranslatorStack>
+where
+    AST: Clone,
+    Token: Clone,
+    TranslatorStack: Clone,
+{
+    type T = Production<AST, Token, TranslatorStack>;
+    type Id = ProductionId;
+    fn intern(&mut self, production: Self::T) -> Self::Id {
+        if let Some(&id) = self.map.get(&production) {
+            return id;
+        }
+        let id = ProductionId(self.map.len());
+        self.map.insert(production.clone(), id);
+        self.vec.push(production);
+
+        id
+    }
+
+    fn lookup(&self, id: Self::Id) -> Self::T {
+        self.vec[id.0].clone()
+    }
+
+    fn reverse_lookup(&self, production: &Self::T) -> Option<Self::Id> {
+        self.map.get(production).map(|x| *x)
     }
 }
