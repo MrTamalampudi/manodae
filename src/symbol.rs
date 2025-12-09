@@ -32,6 +32,7 @@ impl From<&Symbol> for String {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Symbols {
     map: IndexMap<Symbol, usize>,
     vec: Vec<Symbol>,
@@ -40,11 +41,23 @@ pub struct Symbols {
 }
 
 impl Symbols {
+    pub fn new() -> Symbols {
+        Symbols {
+            map: IndexMap::new(),
+            vec: vec![],
+            terminals: vec![],
+            non_terminals: vec![],
+        }
+    }
     pub fn intern(&mut self, symbol: Symbol) -> usize {
         if let Some(&id) = self.map.get(&symbol) {
             return id;
         }
         let id = self.map.len();
+        match symbol {
+            Symbol::NONTERMINAL(_) => self.non_terminals.push(id),
+            Symbol::TERMINAL(_) => self.terminals.push(id),
+        }
         self.map.insert(symbol.clone(), id);
         self.vec.push(symbol);
 
