@@ -8,6 +8,7 @@ use crate::{
     first::compute_first_set,
     follow::compute_follow_set,
     grammar::Grammar,
+    interner::Interner,
     item::{Item, ItemVecExtension},
     production::Production,
     state::{State, StateVecExtension},

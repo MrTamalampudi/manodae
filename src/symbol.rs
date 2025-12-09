@@ -5,6 +5,8 @@ use std::{
 
 use indexmap::IndexMap;
 
+use crate::interner::Interner;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Symbol {
     TERMINAL(String),
@@ -56,20 +58,10 @@ pub(crate) const AUGMENT_START_SYMBOL_ID: SymbolId = SymbolId(0);
 pub(crate) const EOF_SYMBOL_ID: SymbolId = SymbolId(1);
 pub(crate) const START_SYMBOL_ID: SymbolId = SymbolId(2);
 
-impl Symbols {
-    pub fn new() -> Symbols {
-        let mut symbols = Symbols {
-            map: IndexMap::new(),
-            vec: vec![],
-            terminals: vec![],
-            non_terminals: vec![],
-        };
-        symbols.intern(Symbol::NONTERMINAL(String::from("S'")));
-        symbols.intern(Symbol::TERMINAL(String::from("EOF")));
-        symbols.intern(Symbol::NONTERMINAL("Start".to_string()));
-        symbols
-    }
-    pub fn intern(&mut self, symbol: Symbol) -> SymbolId {
+impl Interner for Symbols {
+    type T = Symbol;
+    type Id = SymbolId;
+    fn intern(&mut self, symbol: Symbol) -> SymbolId {
         if let Some(&id) = self.map.get(&symbol) {
             return id;
         }
@@ -84,16 +76,28 @@ impl Symbols {
         id
     }
 
-    #[must_use]
-    pub fn lookup(&self, id: usize) -> Symbol {
-        self.vec[id].clone()
+    fn lookup(&self, id: SymbolId) -> Symbol {
+        self.vec[id.0].clone()
     }
 
-    #[must_use]
-    pub fn reverse_lookup(&self, symbol: &Symbol) -> Option<SymbolId> {
+    fn reverse_lookup(&self, symbol: &Symbol) -> Option<SymbolId> {
         self.map.get(symbol).map(|x| *x)
     }
+}
 
+impl Symbols {
+    pub fn new() -> Symbols {
+        let mut symbols = Symbols {
+            map: IndexMap::new(),
+            vec: vec![],
+            terminals: vec![],
+            non_terminals: vec![],
+        };
+        symbols.intern(Symbol::NONTERMINAL(String::from("S'")));
+        symbols.intern(Symbol::TERMINAL(String::from("EOF")));
+        symbols.intern(Symbol::NONTERMINAL("Start".to_string()));
+        symbols
+    }
     #[inline]
     /// returns true if the id is terminal else false
     pub fn terminal(&self, id: &SymbolId) -> bool {
