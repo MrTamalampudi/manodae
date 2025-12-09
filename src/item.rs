@@ -1,20 +1,21 @@
-use std::{fmt::Debug, hash::Hash, rc::Rc};
+use std::{fmt::Debug, hash::Hash};
 
 use indexmap::IndexMap;
 
 use crate::{
-    production::Production,
-    symbol::{SymbolId, AUGMENT_START_SYMBOL_ID},
+    interner::Interner,
+    production::{ProductionId, Productions},
+    symbol::SymbolId,
 };
 
 #[derive(Debug, Clone)]
-pub struct Item<AST, Token, TranslatorStack> {
-    pub production: Rc<Production<AST, Token, TranslatorStack>>,
+pub struct Item {
+    pub production: ProductionId,
     pub cursor: u8,
     pub lookaheads: Vec<SymbolId>,
 }
 
-impl<AST, Token, TranslatorStack> PartialEq for Item<AST, Token, TranslatorStack> {
+impl PartialEq for Item {
     fn eq(&self, other: &Self) -> bool {
         self.production.eq(&other.production)
             && self.cursor == other.cursor
@@ -22,9 +23,9 @@ impl<AST, Token, TranslatorStack> PartialEq for Item<AST, Token, TranslatorStack
     }
 }
 
-impl<AST, Token, TranslatorStack> Eq for Item<AST, Token, TranslatorStack> {}
+impl Eq for Item {}
 
-impl<AST, Token, TranslatorStack> Hash for Item<AST, Token, TranslatorStack> {
+impl Hash for Item {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.production.hash(state);
         self.cursor.hash(state);
@@ -32,33 +33,36 @@ impl<AST, Token, TranslatorStack> Hash for Item<AST, Token, TranslatorStack> {
     }
 }
 
-impl<AST, Token, TranslatorStack> Item<AST, Token, TranslatorStack> {
-    pub fn n(
-        production: Rc<Production<AST, Token, TranslatorStack>>,
-        cursor: u8,
-        lookaheads: Vec<SymbolId>,
-    ) -> Self {
+impl Item {
+    pub fn n(production: ProductionId, cursor: u8, lookaheads: Vec<SymbolId>) -> Self {
         Item {
             production,
             cursor,
             lookaheads,
         }
     }
-    pub fn next_symbol(&self) -> Option<&SymbolId> {
-        if self.cursor == self.production.body.len() as u8 {
+    pub fn next_symbol<AST, Token, TranslatorStack>(
+        &self,
+        productions: &Productions<AST, Token, TranslatorStack>,
+    ) -> Option<SymbolId>
+    where
+        AST: Clone,
+        Token: Clone,
+        TranslatorStack: Clone,
+    {
+        let production = productions.lookup(self.production);
+        if self.cursor == production.body.len() as u8 {
             None
         } else {
-            self.production.body.get(self.cursor as usize)
+            let symbolId = production.body.get(self.cursor as usize).unwrap();
+            Some(*symbolId)
         }
     }
     pub fn advance_cursor(&mut self) {
         self.cursor += 1;
     }
-    pub fn is_augment_item(&self) -> bool {
-        self.production.head == AUGMENT_START_SYMBOL_ID
-    }
 
-    pub fn is_eq(&self, other: &Item<AST, Token, TranslatorStack>) -> bool {
+    pub fn is_eq(&self, other: &Item) -> bool {
         self.production.eq(&other.production)
             && self.cursor == other.cursor
             && self.lookaheads == other.lookaheads
@@ -69,22 +73,13 @@ pub trait ItemVecExtension<T> {
     fn merge_cores(&mut self);
 }
 
-impl<'a, AST, Token, TranslatorStack> ItemVecExtension<Item<AST, Token, TranslatorStack>>
-    for Vec<Item<AST, Token, TranslatorStack>>
-where
-    AST: PartialEq + Clone + Debug,
-    Token: PartialEq + Clone + Debug,
-    TranslatorStack: PartialEq + Clone + Debug,
-{
+impl ItemVecExtension<Item> for Vec<Item> {
     fn merge_cores(&mut self) {
-        let mut new_items: IndexMap<
-            (Rc<Production<AST, Token, TranslatorStack>>, u8),
-            Item<AST, Token, TranslatorStack>,
-        > = IndexMap::new();
+        let mut new_items: IndexMap<(ProductionId, u8), Item> = IndexMap::new();
         for item in self.iter() {
             new_items
-                .entry((Rc::clone(&item.production), item.cursor))
-                .and_modify(|new_item: &mut Item<AST, Token, TranslatorStack>| {
+                .entry((item.production, item.cursor))
+                .and_modify(|new_item: &mut Item| {
                     for la in item.lookaheads.iter() {
                         if !new_item.lookaheads.contains(la) {
                             new_item.lookaheads.push(la.clone());

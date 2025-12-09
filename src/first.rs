@@ -23,7 +23,7 @@ pub fn compute_first_set<AST, Token, TranslatorStack>(
         }
     });
 
-    for production in grammar.productions.iter() {
+    for production in grammar.productions.vec.iter() {
         let p = productions_hashmap.get_mut(&production.head);
         if let Some(body) = p {
             body.push(production.body.clone());

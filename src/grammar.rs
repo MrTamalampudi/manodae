@@ -1,11 +1,11 @@
 //cfg grammar should be in bnf format
 
-use std::{fmt::Debug, rc::Rc};
+use std::fmt::Debug;
 
 use indexmap::{IndexMap, IndexSet};
 
 use crate::{
-    production::Production,
+    production::{ProductionId, Productions},
     symbol::{SymbolId, Symbols, START_SYMBOL_ID},
 };
 
@@ -13,18 +13,22 @@ use crate::{
 pub struct Grammar<AST, Token, TranslatorStack> {
     pub symbols: Symbols,
     pub start: SymbolId,
-    pub productions: IndexSet<Rc<Production<AST, Token, TranslatorStack>>>,
+    pub productions: Productions<AST, Token, TranslatorStack>,
     //used only when constructing table, no need for parsing
-    pub production_head_map:
-        IndexMap<SymbolId, IndexSet<Rc<Production<AST, Token, TranslatorStack>>>>,
+    pub production_head_map: IndexMap<SymbolId, IndexSet<ProductionId>>,
 }
 
-impl<AST, Token, TranslatorStack> Grammar<AST, Token, TranslatorStack> {
+impl<AST, Token, TranslatorStack> Grammar<AST, Token, TranslatorStack>
+where
+    AST: Clone,
+    Token: Clone,
+    TranslatorStack: Clone,
+{
     pub fn new() -> Self {
         Grammar {
             symbols: Symbols::new(),
             start: START_SYMBOL_ID,
-            productions: IndexSet::new(),
+            productions: Productions::new(),
             production_head_map: IndexMap::new(),
         }
     }
@@ -43,16 +47,6 @@ macro_rules! grammar {
         );+;
     ) => {{
         let mut grammar = Grammar::new();
-        let augmented_production = Production {
-            head: SymbolId(0),
-            body: vec![SymbolId(2)],
-            error_message: None,
-            #[allow(unused_variables)]
-            action: Some(Rc::new(|ast, token_stack, tl_stack, errors| {})),
-            action_tokens : quote::quote!{Rc::new(|ast, token_stack, tl_stack, errors| {})},
-            index: 0
-        };
-        grammar.productions.insert(std::rc::Rc::new(augmented_production));
         $({
             $({let mut body_ : Vec<SymbolId> = Vec::new();
                 $(
@@ -74,7 +68,7 @@ macro_rules! grammar {
                 error_message: None,
                 action:None,
                 action_tokens : quote::quote!{Rc::new(|ast, token_stack, tl_stack, errors| {})},
-                index: grammar.productions.len()
+                index: grammar.productions.vec.len()
             };
             $(
               if $error.to_string().len() > 0 {
@@ -85,7 +79,8 @@ macro_rules! grammar {
                 {production.action = Some(Rc::new(|$arg1,$arg2,$arg3,$arg4| $expr))}
                 {production.action_tokens = quote::quote!{Rc::new(|$arg1,$arg2,$arg3,$arg4| $expr)}}
             )?
-            grammar.productions.insert(std::rc::Rc::new(production));})+
+
+            grammar.productions.intern(production);})+
         })+
         grammar
     }}

@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use indexmap::{IndexMap, IndexSet};
 
 use crate::{
@@ -19,8 +17,9 @@ pub fn compute_follow_set<AST, Token, TranslatorStack>(
         follow_map.insert(*symbol, IndexSet::new());
     });
 
-    let augment_production: Option<&Rc<Production<AST, Token, TranslatorStack>>> = grammar
+    let augment_production: Option<&Production<AST, Token, TranslatorStack>> = grammar
         .productions
+        .vec
         .iter()
         .filter(|prod| prod.head.eq(&AUGMENT_START_SYMBOL_ID))
         .next();
@@ -44,7 +43,7 @@ pub fn compute_follow_set<AST, Token, TranslatorStack>(
     //A -> a B D , then everything in First(D) is in Follow(B)
     //this loop implements above def
     for non_terminal in grammar.symbols.non_terminals.iter() {
-        for production in grammar.productions.iter() {
+        for production in grammar.productions.vec.iter() {
             let with_indexes: Vec<(usize, SymbolId)> = production
                 .body
                 .iter()
@@ -79,7 +78,7 @@ pub fn compute_follow_set<AST, Token, TranslatorStack>(
         };
         let follow_map_count_before = follow_count_func(&follow_map);
 
-        for production in grammar.productions.iter() {
+        for production in grammar.productions.vec.iter() {
             if production.head.eq(&AUGMENT_START_SYMBOL_ID) {
                 continue;
             } else {

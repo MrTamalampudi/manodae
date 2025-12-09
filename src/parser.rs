@@ -1,4 +1,4 @@
-use std::{cell::RefCell, fmt::Debug, ops::Deref, process::exit, rc::Rc};
+use std::{cell::RefCell, fmt::Debug, process::exit, rc::Rc};
 
 use indexmap::{IndexMap, IndexSet};
 
@@ -10,32 +10,24 @@ use crate::{
     grammar::Grammar,
     interner::Interner,
     item::{Item, ItemVecExtension},
-    production::Production,
+    production::{Production, ProductionId, AUGMENT_PRODUCTION_ID},
     state::{State, StateVecExtension},
-    symbol::{Symbol, SymbolId, AUGMENT_START_SYMBOL_ID, EOF_SYMBOL_ID},
+    symbol::{Symbol, SymbolId, EOF_SYMBOL_ID},
 };
 
 #[derive(Debug, Clone)]
 pub struct LR1_Parser<AST, Token, TranslatorStack> {
     pub grammar: Grammar<AST, Token, TranslatorStack>,
-    pub LR1_automata: Vec<Rc<State<AST, Token, TranslatorStack>>>,
+    pub LR1_automata: Vec<Rc<State>>,
     pub follow_set: IndexMap<SymbolId, IndexSet<SymbolId>>,
     pub first_set: IndexMap<SymbolId, IndexSet<SymbolId>>,
     pub conflicts: bool,
-    pub goto: IndexMap<
-        Rc<State<AST, Token, TranslatorStack>>,
-        IndexMap<SymbolId, Rc<State<AST, Token, TranslatorStack>>>,
-    >,
-    pub action: IndexMap<
-        Rc<State<AST, Token, TranslatorStack>>,
-        IndexMap<SymbolId, Action<AST, Token, TranslatorStack>>,
-    >,
+    pub goto: IndexMap<Rc<State>, IndexMap<SymbolId, Rc<State>>>,
+    pub action: IndexMap<Rc<State>, IndexMap<SymbolId, Action>>,
     //used only when constructing table, no need for parsing
-    item_closure_map:
-        IndexMap<Item<AST, Token, TranslatorStack>, Vec<Item<AST, Token, TranslatorStack>>>,
+    item_closure_map: IndexMap<Item, Vec<Item>>,
     //used only when constructing table, no need for parsing
-    closure_map:
-        IndexMap<Vec<Item<AST, Token, TranslatorStack>>, Vec<Item<AST, Token, TranslatorStack>>>,
+    closure_map: IndexMap<Vec<Item>, Vec<Item>>,
 }
 
 impl<AST, Token, TranslatorStack> LR1_Parser<AST, Token, TranslatorStack>
@@ -52,18 +44,15 @@ where
         let first_set = compute_first_set(&grammar);
         let follow_set = compute_follow_set(&grammar);
 
-        let mut production_head_map: IndexMap<
-            SymbolId,
-            IndexSet<Rc<Production<AST, Token, TranslatorStack>>>,
-        > = IndexMap::new();
+        let mut production_head_map: IndexMap<SymbolId, IndexSet<ProductionId>> = IndexMap::new();
 
-        grammar.productions.iter().for_each(|production| {
+        grammar.productions.map.iter().for_each(|(production, id)| {
             production_head_map
                 .entry(production.head)
                 .and_modify(|entry| {
-                    entry.insert(Rc::clone(production));
+                    entry.insert(*id);
                 })
-                .or_insert(IndexSet::from([Rc::clone(production)]));
+                .or_insert(IndexSet::from([*id]));
         });
 
         let mut a = LR1_Parser {
@@ -91,20 +80,21 @@ where
     //                   add [𝐵 → .𝛾,𝑏] to set 𝐼
     //   until no more items are added to 𝐼
     // }
-    fn clousure(&mut self, items: &mut Vec<Item<AST, Token, TranslatorStack>>) {
+    fn clousure(&mut self, items: &mut Vec<Item>) {
         let mut items_count = 0;
         let mut items_iterated_count = 0;
         while items.len().ne(&items_count) {
             items_count = items.len();
-            let mut new_items: Vec<Item<AST, Token, TranslatorStack>> = Vec::new();
+            let mut new_items: Vec<Item> = Vec::new();
             for items_index in items_iterated_count..items.len() {
                 let item = items.get(items_index).unwrap();
                 let existing_item = self.item_closure_map.get(item);
                 if let Some(ei) = existing_item {
                     new_items.extend(ei.clone());
                 } else {
-                    let B = item.next_symbol();
-                    let beta = item.production.body.get((item.cursor + 1) as usize);
+                    let B = item.next_symbol(&self.grammar.productions);
+                    let production = self.grammar.productions.lookup(item.production);
+                    let beta = production.body.get((item.cursor + 1) as usize);
                     let first_of = if let Some(beta) = beta {
                         vec![beta.clone()]
                     } else {
@@ -114,11 +104,11 @@ where
                         continue;
                     }
                     let B = B.unwrap();
-                    if self.grammar.symbols.terminal(B) {
+                    if self.grammar.symbols.terminal(&B) {
                         continue;
                     }
                     let b_productions: &IndexSet<_> =
-                        self.grammar.production_head_map.get(B).unwrap();
+                        self.grammar.production_head_map.get(&B).unwrap();
                     let mut lookaheads = Vec::new();
                     for first in first_of.iter() {
                         for terminal_b in self.first_set.get(first).unwrap().iter() {
@@ -127,9 +117,8 @@ where
                     }
                     let mut ni = vec![];
                     for b_production in b_productions.iter() {
-                        let p = b_production.deref();
                         let item_ = Item {
-                            production: Rc::new(p.clone()),
+                            production: *b_production,
                             cursor: 0,
                             lookaheads: lookaheads.clone(),
                         };
@@ -157,16 +146,16 @@ where
     // }
     fn goto(
         &mut self,
-        state_: &Rc<RefCell<State<AST, Token, TranslatorStack>>>,
+        state_: &Rc<RefCell<State>>,
         symbol: SymbolId,
-    ) -> Option<Rc<RefCell<State<AST, Token, TranslatorStack>>>> {
+    ) -> Option<Rc<RefCell<State>>> {
         let mut new_items = vec![];
         for item in state_.borrow().items.iter() {
-            let item_symbol = item.next_symbol();
+            let item_symbol = item.next_symbol(&self.grammar.productions);
             if item_symbol.is_none() {
                 continue;
             }
-            if symbol != *item_symbol.unwrap() {
+            if symbol != item_symbol.unwrap() {
                 continue;
             }
             let mut item = item.clone();
@@ -200,8 +189,8 @@ where
     //   until no new sets of items are added to 𝐶;
     // }
     fn items(&mut self) {
-        let augmented_item: Item<AST, Token, TranslatorStack> = Item {
-            production: Rc::clone(self.grammar.productions.first().unwrap()),
+        let augmented_item: Item = Item {
+            production: AUGMENT_PRODUCTION_ID,
             cursor: 0,
             lookaheads: vec![EOF_SYMBOL_ID],
         };
@@ -287,20 +276,11 @@ where
     pub fn construct_LALR_Table(&mut self) {
         self.items();
 
-        let mut action: IndexMap<
-            Rc<State<AST, Token, TranslatorStack>>,
-            IndexMap<SymbolId, Action<AST, Token, TranslatorStack>>,
-        > = IndexMap::new();
+        let mut action: IndexMap<Rc<State>, IndexMap<SymbolId, Action>> = IndexMap::new();
 
-        let mut goto: IndexMap<
-            Rc<State<AST, Token, TranslatorStack>>,
-            IndexMap<SymbolId, Rc<State<AST, Token, TranslatorStack>>>,
-        > = IndexMap::new();
+        let mut goto: IndexMap<Rc<State>, IndexMap<SymbolId, Rc<State>>> = IndexMap::new();
 
-        let mut transition_prod_map: IndexMap<
-            Item<AST, Token, TranslatorStack>,
-            &Rc<State<AST, Token, TranslatorStack>>,
-        > = IndexMap::new();
+        let mut transition_prod_map: IndexMap<Item, &Rc<State>> = IndexMap::new();
 
         self.LR1_automata.iter().for_each(|state| {
             for item in state.transition_productions.iter() {
@@ -310,9 +290,9 @@ where
 
         for state in self.LR1_automata.iter() {
             for item in state.items.iter() {
-                let next_symbol = item.next_symbol();
+                let next_symbol = item.next_symbol(&self.grammar.productions);
                 if next_symbol.is_none() {
-                    if item.production.head.ne(&AUGMENT_START_SYMBOL_ID) {
+                    if item.production.ne(&AUGMENT_PRODUCTION_ID) {
                         let mut map = IndexMap::new();
                         item.lookaheads.iter().for_each(|lookahead| {
                             map.insert(*lookahead, Action::REDUCE(item.production.clone()));
@@ -328,12 +308,12 @@ where
                 let symbol = next_symbol.unwrap();
                 let mut item_ = item.clone();
                 item_.advance_cursor();
-                let item_goto_state = state.outgoing.get(symbol);
+                let item_goto_state = state.outgoing.get(&symbol);
                 if item_goto_state.is_none() {
                     continue;
                 }
                 let item_goto_state = item_goto_state.unwrap();
-                if self.grammar.symbols.terminal(symbol) {
+                if self.grammar.symbols.terminal(&symbol) {
                     action
                         .entry(state.clone())
                         .and_modify(|map| {
@@ -347,7 +327,7 @@ where
                             Action::SHIFT(Rc::new(item_goto_state.borrow().clone())),
                         )]));
                 }
-                if self.grammar.symbols.non_terminal(symbol) {
+                if self.grammar.symbols.non_terminal(&symbol) {
                     goto.entry(state.clone())
                         .and_modify(|map| {
                             map.insert(symbol.clone(), Rc::new(item_goto_state.borrow().clone()));
@@ -395,7 +375,7 @@ where
         errors: &mut Vec<ParseError<Token>>,
         ast: &mut AST,
     ) {
-        let mut stack: Vec<Rc<State<AST, Token, TranslatorStack>>> = vec![];
+        let mut stack: Vec<Rc<State>> = vec![];
         let mut input_iter = tokens_input.iter();
         let mut current_input = if let Some(input) = input_iter.next() {
             input
@@ -429,7 +409,8 @@ where
                         current_input = input_iter.next().unwrap();
                         current_input_symbol = Symbol::TERMINAL(current_input.to_string());
                     }
-                    Action::REDUCE(production) => {
+                    Action::REDUCE(productionId) => {
+                        let production = self.grammar.productions.lookup(*productionId);
                         match &production.action {
                             Some(action) => (action.as_ref())(
                                 ast,
@@ -462,8 +443,7 @@ where
                 let mut error_message = self.counstruct_syntax_error_message(S0);
 
                 let deduced_items = S0.transition_productions.clone();
-                let mut deduced_production: Option<Rc<Production<AST, Token, TranslatorStack>>> =
-                    None;
+                let mut deduced_production: Option<Production<AST, Token, TranslatorStack>> = None;
                 loop {
                     stack.pop();
                     let so_o = stack.last();
@@ -475,9 +455,10 @@ where
                     let keys: Vec<SymbolId> = goto_map.clone().into_keys().collect();
                     let mut contains = false;
                     for item in deduced_items.iter() {
-                        if keys.contains(&item.production.head.clone()) {
+                        let production = self.grammar.productions.lookup(item.production);
+                        if keys.contains(&production.head) {
                             contains = true;
-                            deduced_production = Some(item.production.clone());
+                            deduced_production = Some(production);
                             break;
                         }
                     }
@@ -533,10 +514,7 @@ where
         }
     }
 
-    fn counstruct_syntax_error_message(
-        &self,
-        state: &State<AST, Token, TranslatorStack>,
-    ) -> String {
+    fn counstruct_syntax_error_message(&self, state: &State) -> String {
         let action_map = self.action.get(state).unwrap();
         let keys: Vec<SymbolId> = action_map.clone().into_keys().collect();
         let action_keys: Vec<String> = keys.iter().map(|symbol| symbol.to_string()).collect();

@@ -14,15 +14,15 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub struct State<AST, Token, TranslatorStack> {
+pub struct State {
     pub index: usize,
-    pub items: Vec<Item<AST, Token, TranslatorStack>>,
-    pub transition_productions: Vec<Item<AST, Token, TranslatorStack>>,
-    pub outgoing: IndexMap<SymbolId, Rc<RefCell<State<AST, Token, TranslatorStack>>>>,
-    pub incoming: Vec<Rc<RefCell<State<AST, Token, TranslatorStack>>>>,
+    pub items: Vec<Item>,
+    pub transition_productions: Vec<Item>,
+    pub outgoing: IndexMap<SymbolId, Rc<RefCell<State>>>,
+    pub incoming: Vec<Rc<RefCell<State>>>,
 }
 
-impl<AST, Token, TranslatorStack> Hash for State<AST, Token, TranslatorStack> {
+impl Hash for State {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.items.iter().for_each(|item| {
             item.cursor.hash(state);
@@ -31,9 +31,9 @@ impl<AST, Token, TranslatorStack> Hash for State<AST, Token, TranslatorStack> {
     }
 }
 
-impl<AST, Token, TranslatorStack> Eq for State<AST, Token, TranslatorStack> {}
+impl Eq for State {}
 
-impl<AST, Token, TranslatorStack> PartialEq for State<AST, Token, TranslatorStack> {
+impl PartialEq for State {
     fn eq(&self, other: &Self) -> bool {
         for (item, item2) in self.items.iter().zip(other.items.iter()) {
             if item.cursor != item2.cursor || item.production != item2.production {
@@ -44,17 +44,8 @@ impl<AST, Token, TranslatorStack> PartialEq for State<AST, Token, TranslatorStac
     }
 }
 
-impl<AST, Token, TranslatorStack> State<AST, Token, TranslatorStack>
-where
-    AST: Clone,
-    Token: Clone,
-    TranslatorStack: Clone,
-{
-    pub fn new(
-        index: usize,
-        items: Vec<Item<AST, Token, TranslatorStack>>,
-        transition_productions: Vec<Item<AST, Token, TranslatorStack>>,
-    ) -> State<AST, Token, TranslatorStack> {
+impl State {
+    pub fn new(index: usize, items: Vec<Item>, transition_productions: Vec<Item>) -> State {
         State {
             index,
             items,
@@ -71,18 +62,9 @@ pub trait StateVecExtension<T> {
     fn custom_contains(&self, other: &Rc<RefCell<T>>) -> bool;
 }
 
-impl<AST, Token, TranslatorStack> StateVecExtension<State<AST, Token, TranslatorStack>>
-    for Vec<Rc<RefCell<State<AST, Token, TranslatorStack>>>>
-where
-    AST: Clone + PartialEq + Debug,
-    Token: Clone + PartialEq + Debug,
-    TranslatorStack: Clone + PartialEq + Debug,
-{
+impl StateVecExtension<State> for Vec<Rc<RefCell<State>>> {
     fn merge_sets(&mut self) {
-        let mut new_states: IndexMap<
-            State<AST, Token, TranslatorStack>,
-            Rc<RefCell<State<AST, Token, TranslatorStack>>>,
-        > = IndexMap::new();
+        let mut new_states: IndexMap<State, Rc<RefCell<State>>> = IndexMap::new();
         for state in self.iter() {
             let state_entry = new_states
                 .entry(state.borrow().deref().clone())
@@ -128,16 +110,13 @@ where
         self.extend(a);
     }
 
-    fn custom_get(
-        &self,
-        state: &Rc<RefCell<State<AST, Token, TranslatorStack>>>,
-    ) -> Option<Rc<RefCell<State<AST, Token, TranslatorStack>>>> {
+    fn custom_get(&self, state: &Rc<RefCell<State>>) -> Option<Rc<RefCell<State>>> {
         self.iter()
             .cloned()
             .find(|state_ref| state_ref.borrow().clone().eq(&state.borrow().clone()))
     }
 
-    fn custom_contains(&self, other: &Rc<RefCell<State<AST, Token, TranslatorStack>>>) -> bool {
+    fn custom_contains(&self, other: &Rc<RefCell<State>>) -> bool {
         self.iter().any(|state| {
             state
                 .borrow()

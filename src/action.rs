@@ -1,11 +1,11 @@
 use std::rc::Rc;
 
-use crate::{production::Production, state::State};
+use crate::{production::ProductionId, state::State};
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Action<AST, Token, TranslatorStack> {
-    SHIFT(Rc<State<AST, Token, TranslatorStack>>),
-    REDUCE(Rc<Production<AST, Token, TranslatorStack>>),
+pub enum Action {
+    SHIFT(Rc<State>),
+    REDUCE(ProductionId),
     ACCEPT,
     ERROR(String),
 }
