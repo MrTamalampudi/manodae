@@ -4,9 +4,6 @@ use std::{
 };
 
 use indexmap::IndexMap;
-use quote::quote;
-
-use crate::codegen::ToTokens;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Symbol {
@@ -41,13 +38,6 @@ impl From<&Symbol> for String {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct SymbolId(pub usize);
 
-impl ToTokens for SymbolId {
-    fn to_tokens(&self) -> proc_macro2::TokenStream {
-        let id = self.0;
-        quote! {SID(#id)}
-    }
-}
-
 impl Display for SymbolId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!("SymbolId {}", self.0))
@@ -56,8 +46,8 @@ impl Display for SymbolId {
 
 #[derive(Debug, Clone)]
 pub struct Symbols {
-    map: IndexMap<Symbol, SymbolId>,
-    vec: Vec<Symbol>,
+    pub map: IndexMap<Symbol, SymbolId>,
+    pub vec: Vec<Symbol>,
     pub terminals: Vec<SymbolId>,
     pub non_terminals: Vec<SymbolId>,
 }

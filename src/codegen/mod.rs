@@ -18,6 +18,7 @@ pub fn codegen<AST, Token, TranslatorStack>(parser: LR1_Parser<AST, Token, Trans
     let code = quote! {
         use manodae::parser::LR1_Parser as L;
         use manodae::symbol::Symbol as C;
+        use manodae::symbol::SymbolId as SID;
         use manodae::state::State as S;
         use manodae::item::Item as I;
         use manodae::grammar::Grammar as G;
