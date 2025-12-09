@@ -7,6 +7,7 @@ pub mod error;
 pub mod first;
 pub mod follow;
 pub mod grammar;
+mod interner;
 pub mod item;
 pub mod parser;
 pub mod production;
