@@ -32,12 +32,15 @@ impl From<&Symbol> for String {
     }
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct SymbolId(usize);
+
 #[derive(Debug, Clone)]
 pub struct Symbols {
-    map: IndexMap<Symbol, usize>,
+    map: IndexMap<Symbol, SymbolId>,
     vec: Vec<Symbol>,
-    terminals: Vec<usize>,
-    non_terminals: Vec<usize>,
+    terminals: Vec<SymbolId>,
+    non_terminals: Vec<SymbolId>,
 }
 
 impl Symbols {
@@ -49,11 +52,11 @@ impl Symbols {
             non_terminals: vec![],
         }
     }
-    pub fn intern(&mut self, symbol: Symbol) -> usize {
+    pub fn intern(&mut self, symbol: Symbol) -> SymbolId {
         if let Some(&id) = self.map.get(&symbol) {
             return id;
         }
-        let id = self.map.len();
+        let id = SymbolId(self.map.len());
         match symbol {
             Symbol::NONTERMINAL(_) => self.non_terminals.push(id),
             Symbol::TERMINAL(_) => self.terminals.push(id),
@@ -70,18 +73,18 @@ impl Symbols {
     }
 
     #[must_use]
-    pub fn reverse_lookup(&self, symbol: &Symbol) -> Option<usize> {
+    pub fn reverse_lookup(&self, symbol: &Symbol) -> Option<SymbolId> {
         self.map.get(symbol).map(|x| *x)
     }
 
     #[inline]
     /// returns true if the id is terminal else false
-    pub fn terminal(&self, id: &usize) -> bool {
+    pub fn terminal(&self, id: SymbolId) -> bool {
         self.terminals.contains(&id)
     }
     #[inline]
     /// returns true if the id is non_terminal else false
-    pub fn non_terminal(&self, id: &usize) -> bool {
+    pub fn non_terminal(&self, id: SymbolId) -> bool {
         self.non_terminals.contains(&id)
     }
 }
