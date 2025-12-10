@@ -11,14 +11,15 @@ use indexmap::IndexMap;
 use crate::{
     interner::Interner,
     item::{Item, ItemVecExtension},
-    symbol::SymbolId,
+    production::Productions,
+    symbol::{SymbolId, AUGMENT_START_SYMBOL_ID},
 };
 
 #[derive(Debug, Clone)]
 pub struct State {
     pub index: usize,
     pub items: Vec<Item>,
-    pub transition_productions: Vec<Item>,
+    pub transition_symbol: SymbolId,
     pub outgoing: IndexMap<SymbolId, Rc<RefCell<State>>>,
     pub incoming: Vec<Rc<RefCell<State>>>,
 }
@@ -48,14 +49,43 @@ impl PartialEq for State {
 }
 
 impl State {
-    pub fn new(index: usize, items: Vec<Item>, transition_productions: Vec<Item>) -> State {
+    pub fn new(index: usize, items: Vec<Item>, transition_symbol: SymbolId) -> State {
         State {
             index,
             items,
-            transition_productions,
+            transition_symbol,
             outgoing: IndexMap::new(),
             incoming: vec![],
         }
+    }
+
+    pub fn transistion_productions<'a, AST, Token, TranslatorStack>(
+        &'a self,
+        productions: &Productions<AST, Token, TranslatorStack>,
+    ) -> Vec<&'a Item>
+    where
+        AST: Clone,
+        Token: Clone,
+        TranslatorStack: Clone,
+    {
+        let transistion_symbol = self.transition_symbol;
+        if self.transition_symbol == AUGMENT_START_SYMBOL_ID {
+            return vec![];
+        }
+        self.items
+            .iter()
+            .filter(|item| {
+                if item.cursor == 0 {
+                    return false;
+                }
+                let production = productions.lookup(item.production);
+                if production.body[(item.cursor - 1) as usize] == transistion_symbol {
+                    return true;
+                } else {
+                    return false;
+                }
+            })
+            .collect()
     }
 }
 
@@ -78,9 +108,6 @@ impl StateVecExtension<State> for Vec<Rc<RefCell<State>>> {
                     }
                     borrow_mut.outgoing.extend(state.borrow().outgoing.clone());
                     borrow_mut.items.extend(state.borrow().items.clone());
-                    borrow_mut
-                        .transition_productions
-                        .extend(state.borrow().transition_productions.clone());
                 })
                 .or_insert(Rc::clone(state));
 
@@ -103,10 +130,6 @@ impl StateVecExtension<State> for Vec<Rc<RefCell<State>>> {
                 }
             }
             state_entry.borrow_mut().items.merge_cores();
-            state_entry
-                .borrow_mut()
-                .transition_productions
-                .merge_cores();
         }
         let a = new_states.into_values().collect::<Vec<_>>();
         self.clear();
@@ -126,7 +149,7 @@ impl StateVecExtension<State> for Vec<Rc<RefCell<State>>> {
                 .items
                 .iter()
                 .any(|item| other.borrow().items.contains(item))
-                && state.borrow().transition_productions == other.borrow().transition_productions
+                && state.borrow().transition_symbol == other.borrow().transition_symbol
                 && state.borrow().index == other.borrow().index
         })
     }

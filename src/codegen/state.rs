@@ -8,13 +8,12 @@ use crate::{
 
 impl ToTokens for State {
     fn to_tokens(&self) -> proc_macro2::TokenStream {
-        let transition_productions: Vec<_> =
-            self.items.iter().map(|item| item.to_tokens()).collect();
+        let transition_symbol = self.transition_symbol.to_tokens();
         let index = &self.index;
         let items: Vec<_> = self.items.iter().map(|item| item.to_tokens()).collect();
 
         let state = quote! {
-            S::new(#index,vec![#(#items),*],vec![#(#transition_productions),*])
+            S::new(#index,vec![#(#items),*],#transition_symbol)
         };
         state
     }

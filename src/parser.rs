@@ -12,7 +12,7 @@ use crate::{
     item::{Item, ItemVecExtension},
     production::{Production, ProductionId, AUGMENT_PRODUCTION_ID},
     state::{State, StateId, StateVecExtension, States},
-    symbol::{Symbol, SymbolId, EOF_SYMBOL_ID},
+    symbol::{Symbol, SymbolId, AUGMENT_START_SYMBOL_ID, EOF_SYMBOL_ID},
 };
 
 #[derive(Debug, Clone)]
@@ -174,7 +174,7 @@ where
             self.closure_map
                 .insert(transition_productions.clone(), new_items.clone());
         }
-        let state = State::new(0, new_items, transition_productions);
+        let state = State::new(0, new_items, symbol);
         Some(Rc::new(RefCell::new(state)))
     }
 
@@ -197,7 +197,7 @@ where
         let mut S0_items = vec![augmented_item];
         self.clousure(&mut S0_items);
         let mut LR1_automata = vec![Rc::new(RefCell::new(State {
-            transition_productions: vec![],
+            transition_symbol: AUGMENT_START_SYMBOL_ID, // Dummy symbol
             index: 0,
             items: S0_items,
             outgoing: IndexMap::new(),
@@ -434,7 +434,7 @@ where
                 let s0_state = self.LR1_automata.lookup(*S0);
                 let mut error_message = self.counstruct_syntax_error_message(S0);
 
-                let deduced_items = s0_state.transition_productions.clone();
+                let deduced_items = s0_state.transistion_productions(&self.grammar.productions);
                 let mut deduced_production: Option<Production<AST, Token, TranslatorStack>> = None;
                 loop {
                     stack.pop();
