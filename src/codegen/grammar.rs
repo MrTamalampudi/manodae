@@ -7,21 +7,29 @@ use crate::{codegen::ToTokens, grammar::Grammar};
 impl<AST, Token, TranslatorStack> ToTokens for Grammar<AST, Token, TranslatorStack> {
     fn to_tokens(&self) -> TokenStream {
         let start = &self.start.to_tokens();
-        let start = quote! {Rc::new(#start)};
-        let productions: Vec<_> = self
-            .productions
-            .iter()
-            .map(|prod| {
-                let tokens = prod.to_tokens();
-                quote! {Rc::new(#tokens)}
-            })
-            .collect();
-        let productions = quote! {IndexSet::from([#(#productions),*])};
+        let start = quote! {#start};
         let production_head_map = quote! {IndexMap::new()};
+
+        let symbols_vec: Vec<TokenStream> = self
+            .symbols
+            .vec
+            .iter()
+            .map(|symbol| symbol.to_tokens())
+            .collect();
         let symbols = self.symbols.to_tokens();
 
+        let productions_vec: Vec<TokenStream> = self
+            .productions
+            .vec
+            .iter()
+            .map(|productions| productions.to_tokens())
+            .collect();
+        let productions = self.productions.to_tokens();
+
         let grammar = quote! {
-            G {
+            let productions = vec![#(#productions_vec),*];
+            let symbols = vec![#(#symbols_vec),*];
+            Grammar {
                 start:#start,
                 productions:#productions,
                 production_head_map:#production_head_map,

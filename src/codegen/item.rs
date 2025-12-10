@@ -3,21 +3,21 @@ use quote::quote;
 
 use crate::{codegen::ToTokens, item::Item};
 
-impl<AST, Token, TranslatorStack> ToTokens for Item<AST, Token, TranslatorStack> {
+impl ToTokens for Item {
     fn to_tokens(&self) -> TokenStream {
         let la: Vec<_> = self
             .lookaheads
             .iter()
             .map(|sym| {
                 let tokens = sym.to_tokens();
-                quote! {Rc::new(#tokens)}
+                quote! {#tokens}
             })
             .collect();
         let production = &self.production.to_tokens();
         let cursor = &self.cursor;
         let item = quote! {
             I::n(
-                Rc::new(#production),
+                #production,
                 #cursor,
                 vec![#(#la),*]
             )

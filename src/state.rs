@@ -133,7 +133,7 @@ impl StateVecExtension<State> for Vec<Rc<RefCell<State>>> {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub struct StateId(usize);
+pub struct StateId(pub usize);
 
 #[derive(Debug, Clone)]
 pub struct States {

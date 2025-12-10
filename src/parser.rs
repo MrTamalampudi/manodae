@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::hash_map::Keys, fmt::Debug, process::exit, rc::Rc};
+use std::{cell::RefCell, fmt::Debug, process::exit, rc::Rc};
 
 use indexmap::{IndexMap, IndexSet};
 
@@ -278,14 +278,6 @@ where
         let mut action: IndexMap<StateId, IndexMap<SymbolId, Action>> = IndexMap::new();
 
         let mut goto: IndexMap<StateId, IndexMap<SymbolId, StateId>> = IndexMap::new();
-
-        let mut transition_prod_map: IndexMap<Item, &State> = IndexMap::new();
-
-        self.LR1_automata.vec.iter().for_each(|state| {
-            for item in state.transition_productions.iter() {
-                transition_prod_map.entry(item.clone()).or_insert(state);
-            }
-        });
 
         for state in self.LR1_automata.vec.iter() {
             let state_id = self.LR1_automata.reverse_lookup(state).unwrap();

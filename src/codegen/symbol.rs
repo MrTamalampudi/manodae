@@ -28,13 +28,14 @@ impl ToTokens for Symbols {
         let map: Vec<TokenStream> = self
             .map
             .iter()
-            .map(|(key, value)| {
-                let key = key.to_tokens();
+            .map(|(_key, value)| {
+                let index = value.0;
+                let key = quote! { sc!(#index)};
                 let value = value.to_tokens();
                 quote! {(#key,#value)}
             })
             .collect();
-        let vec_: Vec<TokenStream> = self.vec.iter().map(|symbol| symbol.to_tokens()).collect();
+        // let vec_: Vec<TokenStream> = self.vec.iter().map(|symbol| symbol.to_tokens()).collect();
         let terminals: Vec<TokenStream> =
             self.terminals.iter().map(|sid| sid.to_tokens()).collect();
         let non_terminals: Vec<TokenStream> = self
@@ -44,11 +45,11 @@ impl ToTokens for Symbols {
             .collect();
         let symbols = quote! {
             Symbols {
-                map: IndexMap:from([#(#map),*]),
-                vec: vec![#(#vec_),*],
+                map: IndexMap::from([#(#map),*]),
+                vec: symbols,
                 terminals: vec![#(#terminals),*],
                 non_terminals: vec![#(#non_terminals),*],
-            };
+            }
         };
         symbols
     }

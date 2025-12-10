@@ -5,14 +5,7 @@ use crate::{codegen::ToTokens, parser::LR1_Parser};
 
 impl<AST, Token, TranslatorStack> ToTokens for LR1_Parser<AST, Token, TranslatorStack> {
     fn to_tokens(&self) -> TokenStream {
-        let LR1_automata: Vec<_> = self
-            .LR1_automata
-            .iter()
-            .map(|state| {
-                let state = state.to_tokens();
-                quote! {Rc::new(#state)}
-            })
-            .collect();
+        let LR1_automata = self.LR1_automata.to_tokens();
 
         let follow_set: Vec<_> = self
             .follow_set
@@ -22,12 +15,12 @@ impl<AST, Token, TranslatorStack> ToTokens for LR1_Parser<AST, Token, Translator
                     .iter()
                     .map(|sym| {
                         let tokens = sym.to_tokens();
-                        quote! {Rc::new(#tokens)}
+                        quote! {#tokens}
                     })
                     .collect();
                 let value = quote! {IndexSet::from([#(#value),*])};
                 let key = key.to_tokens();
-                quote! {(Rc::new(#key),#value)}
+                quote! {(#key,#value)}
             })
             .collect();
 
@@ -39,12 +32,12 @@ impl<AST, Token, TranslatorStack> ToTokens for LR1_Parser<AST, Token, Translator
                     .iter()
                     .map(|sym| {
                         let tokens = sym.to_tokens();
-                        quote! {Rc::new(#tokens)}
+                        quote! {#tokens}
                     })
                     .collect();
                 let value = quote! {IndexSet::from([#(#value),*])};
                 let key = key.to_tokens();
-                quote! {(Rc::new(#key),#value)}
+                quote! {(#key,#value)}
             })
             .collect();
 
@@ -87,7 +80,7 @@ impl<AST, Token, TranslatorStack> ToTokens for LR1_Parser<AST, Token, Translator
         let parser = quote! {
             L {
                 grammar: #grammar,
-                LR1_automata: vec![#(#LR1_automata),*],
+                LR1_automata: #LR1_automata,
                 follow_set: IndexMap::from([#(#follow_set),*]),
                 first_set: IndexMap::from([#(#first_set),*]),
                 conflicts: false,
