@@ -56,6 +56,30 @@ impl State {
     }
 }
 
+struct HashByItem(State);
+
+impl Hash for HashByItem {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.0.items.iter().for_each(|item| {
+            item.cursor.hash(state);
+            item.production.hash(state);
+        });
+    }
+}
+
+impl PartialEq for HashByItem {
+    fn eq(&self, other: &Self) -> bool {
+        for (item, item2) in self.0.items.iter().zip(other.0.items.iter()) {
+            if item.cursor != item2.cursor || item.production != item2.production {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+impl Eq for HashByItem {}
+
 pub trait StateVecExtension<T> {
     fn merge_sets(&mut self);
     fn custom_get(&self, state: &Rc<RefCell<T>>) -> Option<Rc<RefCell<T>>>;
@@ -64,10 +88,10 @@ pub trait StateVecExtension<T> {
 
 impl StateVecExtension<State> for Vec<Rc<RefCell<State>>> {
     fn merge_sets(&mut self) {
-        let mut new_states: IndexMap<State, Rc<RefCell<State>>> = IndexMap::new();
+        let mut new_states: IndexMap<HashByItem, Rc<RefCell<State>>> = IndexMap::new();
         for state in self.iter() {
             let state_entry = new_states
-                .entry(state.borrow().deref().clone())
+                .entry(HashByItem(state.borrow().deref().clone()))
                 .and_modify(|entry| {
                     let mut borrow_mut = entry.borrow_mut();
                     if !borrow_mut.incoming.contains(state) {
