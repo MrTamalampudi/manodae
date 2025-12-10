@@ -1,4 +1,4 @@
-use std::{cell::RefCell, fmt::Debug, process::exit, rc::Rc};
+use std::{cell::RefCell, collections::hash_map::Keys, fmt::Debug, process::exit, rc::Rc};
 
 use indexmap::{IndexMap, IndexSet};
 
@@ -11,19 +11,19 @@ use crate::{
     interner::Interner,
     item::{Item, ItemVecExtension},
     production::{Production, ProductionId, AUGMENT_PRODUCTION_ID},
-    state::{State, StateVecExtension},
+    state::{State, StateId, StateVecExtension, States},
     symbol::{Symbol, SymbolId, EOF_SYMBOL_ID},
 };
 
 #[derive(Debug, Clone)]
 pub struct LR1_Parser<AST, Token, TranslatorStack> {
     pub grammar: Grammar<AST, Token, TranslatorStack>,
-    pub LR1_automata: Vec<Rc<State>>,
+    pub LR1_automata: States,
     pub follow_set: IndexMap<SymbolId, IndexSet<SymbolId>>,
     pub first_set: IndexMap<SymbolId, IndexSet<SymbolId>>,
     pub conflicts: bool,
-    pub goto: IndexMap<Rc<State>, IndexMap<SymbolId, Rc<State>>>,
-    pub action: IndexMap<Rc<State>, IndexMap<SymbolId, Action>>,
+    pub goto: IndexMap<StateId, IndexMap<SymbolId, StateId>>,
+    pub action: IndexMap<StateId, IndexMap<SymbolId, Action>>,
     //used only when constructing table, no need for parsing
     item_closure_map: IndexMap<Item, Vec<Item>>,
     //used only when constructing table, no need for parsing
@@ -57,7 +57,7 @@ where
 
         let mut a = LR1_Parser {
             grammar,
-            LR1_automata: Vec::new(),
+            LR1_automata: States::new(),
             first_set,
             follow_set,
             conflicts: false,
@@ -244,10 +244,9 @@ where
 
         LR1_automata.merge_sets();
 
-        self.LR1_automata = LR1_automata
-            .iter()
-            .map(|state| Rc::new(state.borrow().clone()))
-            .collect();
+        LR1_automata.iter().for_each(|state| {
+            self.LR1_automata.intern(state.borrow().clone());
+        });
     }
 
     // Algorithm
@@ -276,19 +275,20 @@ where
     pub fn construct_LALR_Table(&mut self) {
         self.items();
 
-        let mut action: IndexMap<Rc<State>, IndexMap<SymbolId, Action>> = IndexMap::new();
+        let mut action: IndexMap<StateId, IndexMap<SymbolId, Action>> = IndexMap::new();
 
-        let mut goto: IndexMap<Rc<State>, IndexMap<SymbolId, Rc<State>>> = IndexMap::new();
+        let mut goto: IndexMap<StateId, IndexMap<SymbolId, StateId>> = IndexMap::new();
 
-        let mut transition_prod_map: IndexMap<Item, &Rc<State>> = IndexMap::new();
+        let mut transition_prod_map: IndexMap<Item, &State> = IndexMap::new();
 
-        self.LR1_automata.iter().for_each(|state| {
+        self.LR1_automata.vec.iter().for_each(|state| {
             for item in state.transition_productions.iter() {
                 transition_prod_map.entry(item.clone()).or_insert(state);
             }
         });
 
-        for state in self.LR1_automata.iter() {
+        for state in self.LR1_automata.vec.iter() {
+            let state_id = self.LR1_automata.reverse_lookup(state).unwrap();
             for item in state.items.iter() {
                 let next_symbol = item.next_symbol(&self.grammar.productions);
                 if next_symbol.is_none() {
@@ -297,10 +297,11 @@ where
                         item.lookaheads.iter().for_each(|lookahead| {
                             map.insert(*lookahead, Action::REDUCE(item.production.clone()));
                         });
-                        action.entry(state.clone()).insert_entry(map);
+
+                        action.entry(state_id).insert_entry(map);
                     } else {
                         action
-                            .entry(state.clone())
+                            .entry(state_id)
                             .insert_entry(IndexMap::from([(EOF_SYMBOL_ID, Action::ACCEPT)]));
                     }
                     continue;
@@ -313,29 +314,27 @@ where
                     continue;
                 }
                 let item_goto_state = item_goto_state.unwrap();
+                let goto_state_id = self
+                    .LR1_automata
+                    .reverse_lookup(&*item_goto_state.borrow())
+                    .unwrap();
                 if self.grammar.symbols.terminal(&symbol) {
                     action
-                        .entry(state.clone())
+                        .entry(state_id)
                         .and_modify(|map| {
-                            map.insert(
-                                symbol.clone(),
-                                Action::SHIFT(Rc::new(item_goto_state.borrow().clone())),
-                            );
+                            map.insert(symbol.clone(), Action::SHIFT(goto_state_id));
                         })
                         .or_insert(IndexMap::from([(
                             symbol.clone(),
-                            Action::SHIFT(Rc::new(item_goto_state.borrow().clone())),
+                            Action::SHIFT(goto_state_id),
                         )]));
                 }
                 if self.grammar.symbols.non_terminal(&symbol) {
-                    goto.entry(state.clone())
+                    goto.entry(state_id)
                         .and_modify(|map| {
-                            map.insert(symbol.clone(), Rc::new(item_goto_state.borrow().clone()));
+                            map.insert(symbol, goto_state_id);
                         })
-                        .or_insert(IndexMap::from([(
-                            symbol.clone(),
-                            Rc::new(item_goto_state.borrow().clone()),
-                        )]));
+                        .or_insert(IndexMap::from([(symbol, goto_state_id)]));
                 }
             }
         }
@@ -375,7 +374,7 @@ where
         errors: &mut Vec<ParseError<Token>>,
         ast: &mut AST,
     ) {
-        let mut stack: Vec<Rc<State>> = vec![];
+        let mut stack: Vec<StateId> = vec![];
         let mut input_iter = tokens_input.iter();
         let mut current_input = if let Some(input) = input_iter.next() {
             input
@@ -384,11 +383,11 @@ where
         };
         let mut previous_input = current_input;
         let mut current_input_symbol = Symbol::TERMINAL(current_input.to_string());
-        let mut S0 = self.LR1_automata.first().unwrap();
+        let mut S0 = self.LR1_automata.map.first().unwrap().1;
         let mut translator_stack: Vec<TranslatorStack> = Vec::new();
         let mut input_token_stack: Vec<Token> = Vec::new();
 
-        stack.push(Rc::clone(S0));
+        stack.push(*S0);
         loop {
             S0 = stack.last().unwrap();
             //every state will be in action_map so unwrap
@@ -399,8 +398,8 @@ where
             }
             if let Some(action) = action_map.get(&symbol_id.unwrap()) {
                 match action {
-                    Action::SHIFT(state) => {
-                        stack.push(Rc::clone(state));
+                    Action::SHIFT(stateId) => {
+                        stack.push(*stateId);
 
                         //To maintain current input as a stack helps library user;
                         input_token_stack.push(current_input.clone());
@@ -425,7 +424,7 @@ where
                         let goto_map = self.goto.get(stack_top).unwrap();
                         let goto_stack = goto_map.get(&production.head);
                         if let Some(goto_stack) = goto_stack {
-                            stack.push(Rc::clone(goto_stack));
+                            stack.push(*goto_stack);
                         }
                     }
                     Action::ACCEPT => {
@@ -440,9 +439,10 @@ where
                 //error recovery
                 //implement second method in this paper https://ieeexplore.ieee.org/document/6643853
                 //@todo need to optimise
+                let s0_state = self.LR1_automata.lookup(*S0);
                 let mut error_message = self.counstruct_syntax_error_message(S0);
 
-                let deduced_items = S0.transition_productions.clone();
+                let deduced_items = s0_state.transition_productions.clone();
                 let mut deduced_production: Option<Production<AST, Token, TranslatorStack>> = None;
                 loop {
                     stack.pop();
@@ -514,9 +514,14 @@ where
         }
     }
 
-    fn counstruct_syntax_error_message(&self, state: &State) -> String {
+    fn counstruct_syntax_error_message(&self, state: &StateId) -> String {
         let action_map = self.action.get(state).unwrap();
-        let keys: Vec<SymbolId> = action_map.clone().into_keys().collect();
+        let keys: Vec<Symbol> = action_map
+            .clone()
+            .into_keys()
+            .into_iter()
+            .map(|symbol_id| self.grammar.symbols.lookup(symbol_id))
+            .collect();
         let action_keys: Vec<String> = keys.iter().map(|symbol| symbol.to_string()).collect();
         String::from("Expected ") + join_either_or(action_keys).as_str()
     }

@@ -1,10 +1,8 @@
-use std::rc::Rc;
-
-use crate::{production::ProductionId, state::State};
+use crate::{production::ProductionId, state::StateId};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Action {
-    SHIFT(Rc<State>),
+    SHIFT(StateId),
     REDUCE(ProductionId),
     ACCEPT,
     ERROR(String),
