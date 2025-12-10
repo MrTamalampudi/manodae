@@ -9,6 +9,7 @@ use std::{
 use indexmap::IndexMap;
 
 use crate::{
+    interner::Interner,
     item::{Item, ItemVecExtension},
     symbol::SymbolId,
 };
@@ -24,10 +25,7 @@ pub struct State {
 
 impl Hash for State {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.items.iter().for_each(|item| {
-            item.cursor.hash(state);
-            item.production.hash(state);
-        });
+        self.items.hash(state);
     }
 }
 
@@ -35,12 +33,7 @@ impl Eq for State {}
 
 impl PartialEq for State {
     fn eq(&self, other: &Self) -> bool {
-        for (item, item2) in self.items.iter().zip(other.items.iter()) {
-            if item.cursor != item2.cursor || item.production != item2.production {
-                return false;
-            }
-        }
-        return true;
+        self.items == other.items
     }
 }
 
@@ -56,6 +49,8 @@ impl State {
     }
 }
 
+//Uniquely identifies a state by its item.cursor and item.production fields
+//to merge sets we donot care lookaheads if productions and cursors are same
 struct HashByItem(State);
 
 impl Hash for HashByItem {
@@ -150,5 +145,47 @@ impl StateVecExtension<State> for Vec<Rc<RefCell<State>>> {
                 && state.borrow().transition_productions == other.borrow().transition_productions
                 && state.borrow().index == other.borrow().index
         })
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct StateId(usize);
+
+pub struct States {
+    map: IndexMap<State, StateId>,
+    vec: Vec<State>,
+}
+
+impl States {
+    pub fn new() -> States {
+        States {
+            map: IndexMap::new(),
+            vec: vec![],
+        }
+    }
+}
+
+impl Interner for States {
+    type Id = StateId;
+    type T = State;
+
+    fn intern(&mut self, state: Self::T) -> Self::Id {
+        if let Some(&id) = self.map.get(&state) {
+            return id;
+        }
+
+        let id = StateId(self.map.len());
+        self.map.insert(state.clone(), id);
+        self.vec.push(state);
+
+        id
+    }
+
+    fn lookup(&self, id: Self::Id) -> Self::T {
+        self.vec[id.0].clone()
+    }
+
+    fn reverse_lookup(&self, production: &Self::T) -> Option<Self::Id> {
+        self.map.get(production).map(|x| *x)
     }
 }
