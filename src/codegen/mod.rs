@@ -1,4 +1,10 @@
-use std::{fs::File, io::Write, process::Command};
+use std::{
+    fmt::Debug,
+    fs::File,
+    io::Write,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use indexmap::{IndexMap, IndexSet};
 use proc_macro2::TokenStream;
@@ -24,19 +30,28 @@ pub trait ToTokens {
     fn to_tokens(&self) -> TokenStream;
 }
 
-pub fn codegen<AST, Token, TranslatorStack>(parser: LR1_Parser<AST, Token, TranslatorStack>)
-where
-    AST: Clone,
-    Token: Clone,
-    TranslatorStack: Clone,
+pub fn codegen<AST, Token, TranslatorStack>(
+    path: PathBuf,
+    parser: LR1_Parser<AST, Token, TranslatorStack>,
+) where
+    AST: Clone + Debug + PartialEq,
+    Token: Clone + Debug + PartialEq + ToString,
+    TranslatorStack: Clone + Debug + PartialEq,
 {
-    write_grammar(parser.grammar.clone());
-    write_LR1_Automata(parser.LR1_automata.clone());
-    write_first_follow_set(parser.first_set.clone(), "first");
-    write_first_follow_set(parser.follow_set.clone(), "follow");
-    write_action(parser.action.clone());
-    write_goto(parser.goto.clone());
+    let mut command = Command::new("mkdir");
+    command.arg("parser_generated");
+    command.current_dir(path.parent().unwrap());
+    command.spawn().expect("msg");
+    let pg = path.parent().unwrap().join("parser_generated");
+    write_grammar(parser.grammar.clone(), pg.clone());
+    write_LR1_Automata(parser.LR1_automata.clone(), pg.clone());
+    write_first_follow_set(parser.first_set.clone(), "first", pg.clone());
+    write_first_follow_set(parser.follow_set.clone(), "follow", pg.clone());
+    write_action(parser.action.clone(), pg.clone());
+    write_goto(parser.goto.clone(), pg);
     //let parser = parser.to_tokens();
+    println!("pathhhhhhhhhhhh  {:#?}", path);
+
     let code = quote! {
         use manodae::parser::LR1_Parser;
         use indexmap::IndexMap;
@@ -80,7 +95,10 @@ where
         .spawn();
 }
 
-fn write_grammar<AST, Token, TranslatorStack>(grammar: Grammar<AST, Token, TranslatorStack>) {
+fn write_grammar<AST, Token, TranslatorStack>(
+    grammar: Grammar<AST, Token, TranslatorStack>,
+    path: PathBuf,
+) {
     let grammar = grammar.to_tokens();
     let closure_macro = closure_macro();
     let symbols_clone_macro = symbol_clone_macro();
@@ -106,11 +124,11 @@ fn write_grammar<AST, Token, TranslatorStack>(grammar: Grammar<AST, Token, Trans
         }
     };
     let code_s = code.to_string();
-    let mut file = File::create("grammar.rs").unwrap();
+    let mut file = File::create(path.join("grammar.rs")).unwrap();
     file.write_all(code_s.as_bytes()).ok();
 }
 
-pub fn write_LR1_Automata(lr: States) {
+pub fn write_LR1_Automata(lr: States, path: PathBuf) {
     let states = lr.to_tokens();
     let code = quote! {
         use indexmap::IndexMap;
@@ -133,11 +151,11 @@ pub fn write_LR1_Automata(lr: States) {
         }
     };
     let code_s = code.to_string();
-    let mut file = File::create("lr.rs").unwrap();
+    let mut file = File::create(path.join("lr.rs")).unwrap();
     file.write_all(code_s.as_bytes()).ok();
 }
 
-fn write_first_follow_set(set: IndexMap<SymbolId, IndexSet<SymbolId>>, name: &str) {
+fn write_first_follow_set(set: IndexMap<SymbolId, IndexSet<SymbolId>>, name: &str, path: PathBuf) {
     let set: Vec<_> = set
         .iter()
         .map(|(key, value)| {
@@ -165,11 +183,11 @@ fn write_first_follow_set(set: IndexMap<SymbolId, IndexSet<SymbolId>>, name: &st
 
     let filename = format!("{name}.rs");
     let code_s = code.to_string();
-    let mut file = File::create(filename).unwrap();
+    let mut file = File::create(path.join(filename)).unwrap();
     file.write_all(code_s.as_bytes()).ok();
 }
 
-fn write_action(action: IndexMap<StateId, IndexMap<SymbolId, Action>>) {
+fn write_action(action: IndexMap<StateId, IndexMap<SymbolId, Action>>, path: PathBuf) {
     let indexmap_from = indexmap_from_macro();
     let action: Vec<_> = action
         .iter()
@@ -204,10 +222,10 @@ fn write_action(action: IndexMap<StateId, IndexMap<SymbolId, Action>>) {
         }
     };
     let code_s = code.to_string();
-    let mut file = File::create("action.rs").unwrap();
+    let mut file = File::create(path.join("action.rs")).unwrap();
     file.write_all(code_s.as_bytes()).ok();
 }
-fn write_goto(goto: IndexMap<StateId, IndexMap<SymbolId, StateId>>) {
+fn write_goto(goto: IndexMap<StateId, IndexMap<SymbolId, StateId>>, path: PathBuf) {
     let indexmap_from = indexmap_from_macro();
     let goto: Vec<_> = goto
         .iter()
@@ -238,7 +256,7 @@ fn write_goto(goto: IndexMap<StateId, IndexMap<SymbolId, StateId>>) {
         }
     };
     let code_s = code.to_string();
-    let mut file = File::create("goto.rs").unwrap();
+    let mut file = File::create(path.join("goto.rs")).unwrap();
     file.write_all(code_s.as_bytes()).ok();
 }
 
