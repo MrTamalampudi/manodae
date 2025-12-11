@@ -35,26 +35,48 @@ where
     write_first_follow_set(parser.first_set.clone(), "first");
     write_first_follow_set(parser.follow_set.clone(), "follow");
     write_action(parser.action.clone());
+    write_goto(parser.goto.clone());
     //let parser = parser.to_tokens();
     let code = quote! {
-        use manodae::parser::LR1_Parser as L;
-        use manodae::symbol::Symbol as C;
-        use manodae::symbol::SymbolId as SID;
-        use manodae::state::State as S;
-        use manodae::item::Item as I;
-        use manodae::grammar::Grammar as G;
-        use manodae::action::Action as A;
-        use manodae::production::Production as P;
+        use manodae::parser::LR1_Parser;
+        use indexmap::IndexMap;
+
+        include!("grammar.rs");
+        include!("lr.rs");
+        include!("first.rs");
+        include!("follow.rs");
+        include!("action.rs");
+        include!("goto.rs");
 
         fn get_parser() -> LR1_Parser<AST, Token, TranslatorStack> {
-            //let parser = #parser
+            LR1_Parser {
+                grammar: grammar(),
+                LR1_automata: lr(),
+                follow_set: follow(),
+                first_set: first(),
+                conflicts: false,
+                goto: goto(),
+                action: action(),
+                //used only when constructing table, no need for parsing
+                item_closure_map: IndexMap::new(),
+                //used only when constructing table, no need for parsing
+                closure_map: IndexMap::new(),
+            }
         }
     };
     let code_s = code.to_string();
     let mut file = File::create("parser.rs").unwrap();
     file.write_all(code_s.as_bytes()).ok();
     let _ = Command::new("rustfmt")
-        .args(["grammar.rs", "first.rs", "follow.rs", "lr.rs", "action.rs"])
+        .args([
+            "grammar.rs",
+            "first.rs",
+            "follow.rs",
+            "lr.rs",
+            "action.rs",
+            "goto.rs",
+            "parser.rs",
+        ])
         .spawn();
 }
 
@@ -183,6 +205,40 @@ fn write_action(action: IndexMap<StateId, IndexMap<SymbolId, Action>>) {
     };
     let code_s = code.to_string();
     let mut file = File::create("action.rs").unwrap();
+    file.write_all(code_s.as_bytes()).ok();
+}
+fn write_goto(goto: IndexMap<StateId, IndexMap<SymbolId, StateId>>) {
+    let indexmap_from = indexmap_from_macro();
+    let goto: Vec<_> = goto
+        .iter()
+        .map(|(key, value)| {
+            let value: Vec<_> = value
+                .iter()
+                .map(|(key, value)| {
+                    let key = key.to_tokens();
+                    let value = value.to_tokens();
+                    quote! {(#key,#value)}
+                })
+                .collect();
+            let key = key.to_tokens();
+            //m! expands to IndexMap::from(..);
+            let value = quote! {m!([#(#value),*])};
+            quote! {(#key,#value)}
+        })
+        .collect();
+    let code = quote! {
+        use indexmap::{IndexMap, IndexSet};
+        use manodae::state::StateId as i;
+        use manodae::symbol::SymbolId as s;
+
+        #indexmap_from
+
+        fn action() -> IndexMap<StateId, IndexMap<SymbolId, Action>> {
+            IndexMap::from([#(#goto),*])
+        }
+    };
+    let code_s = code.to_string();
+    let mut file = File::create("goto.rs").unwrap();
     file.write_all(code_s.as_bytes()).ok();
 }
 
