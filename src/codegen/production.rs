@@ -9,7 +9,8 @@ use crate::{
 impl<AST, Tokens, TranslatorStack> ToTokens for Production<AST, Tokens, TranslatorStack> {
     fn to_tokens(&self) -> TokenStream {
         let error_message = match &self.error_message {
-            Some(err) => quote! {Some(String::new(#err))},
+            //sf!(err) expands to String::from(err)
+            Some(err) => quote! {Some(sf!(#err))},
             None => quote! {None},
         };
         let action = if self.action_tokens.is_empty() {
@@ -32,7 +33,7 @@ impl<AST, Tokens, TranslatorStack> ToTokens for Production<AST, Tokens, Translat
             P::n(
                 #index,
                 #head,
-                Vec::new([#(#body),*]),
+                vec![#(#body),*],
                 #error_message,
                 #action_tokens,
                 #action,
@@ -45,7 +46,8 @@ impl<AST, Tokens, TranslatorStack> ToTokens for Production<AST, Tokens, Translat
 impl ToTokens for ProductionId {
     fn to_tokens(&self) -> proc_macro2::TokenStream {
         let id = self.0;
-        quote! {PID(#id)}
+        //expands to ProductionId(id)
+        quote! {p(#id)}
     }
 }
 

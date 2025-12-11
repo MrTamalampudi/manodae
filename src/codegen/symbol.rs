@@ -9,8 +9,10 @@ use crate::{
 impl ToTokens for Symbol {
     fn to_tokens(&self) -> proc_macro2::TokenStream {
         let t = match self {
-            Symbol::TERMINAL(terminal) => quote! { C::TERMINAL(String::from(#terminal))},
-            Symbol::NONTERMINAL(terminal) => quote! { C::NONTERMINAL(String::from(#terminal))},
+            //T(sf!(#terminal)) expands to TERMINAL(String::from("Some"))
+            Symbol::TERMINAL(terminal) => quote! { T(sf!(#terminal))},
+            //NT(sf!(#terminal)) expands to NONTERMINAL(String::from("Some"))
+            Symbol::NONTERMINAL(terminal) => quote! { NT(sf!(#terminal))},
         };
         t
     }
@@ -19,7 +21,8 @@ impl ToTokens for Symbol {
 impl ToTokens for SymbolId {
     fn to_tokens(&self) -> proc_macro2::TokenStream {
         let id = self.0;
-        quote! {SID(#id)}
+        //expands to SymbolId(id)
+        quote! {s(#id)}
     }
 }
 

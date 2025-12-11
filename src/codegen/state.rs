@@ -22,7 +22,8 @@ impl ToTokens for State {
 impl ToTokens for StateId {
     fn to_tokens(&self) -> proc_macro2::TokenStream {
         let id = self.0;
-        quote! {PID(#id)}
+        //expand to StateId(id)
+        quote! {i(#id)}
     }
 }
 
