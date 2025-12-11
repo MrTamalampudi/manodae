@@ -85,7 +85,7 @@ impl<AST, Token, TranslatorStack> ToTokens for LR1_Parser<AST, Token, Translator
                 first_set: IndexMap::from([#(#first_set),*]),
                 conflicts: false,
                 goto: IndexMap::from([#(#goto),*]),
-                action: IndexMap::from([#(#action),*]),,
+                action: IndexMap::from([#(#action),*]),
                 item_closure_map:IndexMap::new(),
                 closure_map:IndexMap::new(),
             }

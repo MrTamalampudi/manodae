@@ -4,7 +4,13 @@ use indexmap::{IndexMap, IndexSet};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
-use crate::{grammar::Grammar, parser::LR1_Parser, state::States, symbol::SymbolId};
+use crate::{
+    action::Action,
+    grammar::Grammar,
+    parser::LR1_Parser,
+    state::{StateId, States},
+    symbol::SymbolId,
+};
 
 mod action;
 mod grammar;
@@ -28,6 +34,7 @@ where
     write_LR1_Automata(parser.LR1_automata.clone());
     write_first_follow_set(parser.first_set.clone(), "first");
     write_first_follow_set(parser.follow_set.clone(), "follow");
+    write_action(parser.action.clone());
     //let parser = parser.to_tokens();
     let code = quote! {
         use manodae::parser::LR1_Parser as L;
@@ -47,7 +54,7 @@ where
     let mut file = File::create("parser.rs").unwrap();
     file.write_all(code_s.as_bytes()).ok();
     let _ = Command::new("rustfmt")
-        .args(["grammar.rs", "first.rs", "follow.rs", "lr.rs"])
+        .args(["grammar.rs", "first.rs", "follow.rs", "lr.rs", "action.rs"])
         .spawn();
 }
 
@@ -140,6 +147,45 @@ fn write_first_follow_set(set: IndexMap<SymbolId, IndexSet<SymbolId>>, name: &st
     file.write_all(code_s.as_bytes()).ok();
 }
 
+fn write_action(action: IndexMap<StateId, IndexMap<SymbolId, Action>>) {
+    let indexmap_from = indexmap_from_macro();
+    let action: Vec<_> = action
+        .iter()
+        .map(|(key, value)| {
+            let value: Vec<_> = value
+                .iter()
+                .map(|(key, value)| {
+                    let key = key.to_tokens();
+                    let value = value.to_tokens();
+                    quote! {(#key,#value)}
+                })
+                .collect();
+            let key = key.to_tokens();
+            //m! expands to IndexMap::from(..);
+            let value = quote! {m!([#(#value),*])};
+            quote! {(#key,#value)}
+        })
+        .collect();
+    let code = quote! {
+        use indexmap::{IndexMap, IndexSet};
+        use manodae::state::StateId as i;
+        use manodae::action::Action::SHIFT as S;
+        use manodae::action::Action::REDUCE as R;
+        use manodae::action::Action::ERROR as E;
+        use manodae::action::Action::ACCEPT as A;
+        use manodae::symbol::SymbolId as s;
+
+        #indexmap_from
+
+        fn action() -> IndexMap<StateId, IndexMap<SymbolId, Action>> {
+            IndexMap::from([#(#action),*])
+        }
+    };
+    let code_s = code.to_string();
+    let mut file = File::create("action.rs").unwrap();
+    file.write_all(code_s.as_bytes()).ok();
+}
+
 fn closure_macro() -> TokenStream {
     quote! {
         macro_rules! c {
@@ -172,6 +218,15 @@ fn string_from_macro() -> TokenStream {
         macro_rules! sf {
             ($s:expr) => {
                 String::from($s)
+            };
+        }
+    }
+}
+fn indexmap_from_macro() -> TokenStream {
+    quote! {
+        macro_rules! m {
+            ($s:expr) => {
+                IndexMap::from($s)
             };
         }
     }

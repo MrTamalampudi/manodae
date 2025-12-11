@@ -8,14 +8,18 @@ impl ToTokens for Action {
         match self {
             Action::SHIFT(state) => {
                 let state = state.to_tokens();
-                quote! {A::SHIFT(#state)}
+                //expands to ACTION::SHIFT(state)
+                quote! {S(#state)}
             }
             Action::REDUCE(production) => {
                 let production = production.to_tokens();
-                quote! {A::REDUCE(#production)}
+                //expands to ACTION::REDUCE(production)
+                quote! {R(#production)}
             }
-            Action::ERROR(err) => quote! {A::ERROR(String::new(#err))},
-            Action::ACCEPT => quote! {A::ACCEPT},
+            //expands to ACTION::ERROR(String)
+            Action::ERROR(err) => quote! {E(String::new(#err))},
+            //expands to ACTION::ACCEPT
+            Action::ACCEPT => quote! {A},
         }
     }
 }
