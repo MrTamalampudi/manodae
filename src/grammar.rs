@@ -1,6 +1,6 @@
 //cfg grammar should be in bnf format
 
-use std::fmt::Debug;
+use std::{fmt::Debug, hash::Hash};
 
 use indexmap::{IndexMap, IndexSet};
 
@@ -16,6 +16,14 @@ pub struct Grammar<AST, Token, TranslatorStack> {
     pub productions: Productions<AST, Token, TranslatorStack>,
     //used only when constructing table, no need for parsing
     pub production_head_map: IndexMap<SymbolId, IndexSet<ProductionId>>,
+}
+
+impl<AST, Token, TranslatorStack> Hash for Grammar<AST, Token, TranslatorStack> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.symbols.hash(state);
+        self.start.hash(state);
+        self.productions.hash(state);
+    }
 }
 
 impl<AST, Token, TranslatorStack> Grammar<AST, Token, TranslatorStack>

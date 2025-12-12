@@ -111,6 +111,12 @@ pub struct Productions<AST, Token, TranslatorStack> {
     pub vec: Vec<Production<AST, Token, TranslatorStack>>,
 }
 
+impl<AST, Token, TranslatorStack> Hash for Productions<AST, Token, TranslatorStack> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.vec.hash(state);
+    }
+}
+
 impl<AST, Token, TranslatorStack> Productions<AST, Token, TranslatorStack>
 where
     AST: Clone,

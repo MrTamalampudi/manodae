@@ -54,6 +54,14 @@ pub struct Symbols {
     pub non_terminals: Vec<SymbolId>,
 }
 
+impl Hash for Symbols {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.vec.hash(state);
+        self.terminals.hash(state);
+        self.non_terminals.hash(state);
+    }
+}
+
 pub(crate) const AUGMENT_START_SYMBOL_ID: SymbolId = SymbolId(0);
 pub(crate) const EOF_SYMBOL_ID: SymbolId = SymbolId(1);
 pub(crate) const START_SYMBOL_ID: SymbolId = SymbolId(2);
