@@ -9,7 +9,7 @@ use std::{
 };
 
 use indexmap::{IndexMap, IndexSet};
-use proc_macro2::TokenStream;
+use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 
 use crate::{
@@ -35,6 +35,7 @@ pub trait ToTokens {
 pub struct Codegen<AST, Token, TranslatorStack> {
     path: PathBuf,
     grammar: Grammar<AST, Token, TranslatorStack>,
+    generics: Vec<Ident>,
 }
 
 const FOLDER: &str = "parser_generated";
@@ -53,11 +54,19 @@ where
     Token: Debug + PartialEq + Clone + ToString,
     TranslatorStack: Debug + PartialEq + Clone,
 {
-    pub fn gen(path: PathBuf, grammar: Grammar<AST, Token, TranslatorStack>) {
+    pub fn gen(
+        path: PathBuf,
+        grammar: Grammar<AST, Token, TranslatorStack>,
+        generics: [&'static str; 3],
+    ) {
         let path = path.parent().unwrap().to_path_buf();
         let mut codegen = Codegen {
             path: path,
             grammar: grammar,
+            generics: generics
+                .iter()
+                .map(|g| format_ident!("{}", g))
+                .collect::<Vec<Ident>>(),
         };
         codegen.mkdir();
         let hash = codegen.grammar_hash();
@@ -124,6 +133,7 @@ where
     }
 
     fn write_parser(&self) {
+        let [a, t, ts] = [&self.generics[0], &self.generics[1], &self.generics[2]];
         let code = quote! {
             include!(#F_GRAMMAR);
             include!(#F_LR);
@@ -134,7 +144,7 @@ where
 
 
 
-            fn get_parser() -> LR1_Parser<AST, Token, TranslatorStack> {
+            fn get_parser() -> LR1_Parser<#a,#t ,#ts> {
                 LR1_Parser {
                     grammar: __grammar__(),
                     LR1_automata: __lr__(),
@@ -156,6 +166,7 @@ where
     }
 
     fn write_grammar(&self, grammar: Grammar<AST, Token, TranslatorStack>) {
+        let [a, t, ts] = [&self.generics[0], &self.generics[1], &self.generics[2]];
         let grammar = grammar.to_tokens();
         let q = quote_macro();
         let f = string_from_macro();
@@ -166,7 +177,7 @@ where
             #f
             #s
             #d
-            fn __grammar__() -> Grammar<AST, Token, TranslatorStack> {
+            fn __grammar__() -> Grammar<#a,#t ,#ts> {
                 #grammar
             }
         };
