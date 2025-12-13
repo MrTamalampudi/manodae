@@ -75,7 +75,7 @@ macro_rules! grammar {
                 body: body_,
                 error_message: None,
                 action:None,
-                action_tokens : quote::quote!{c!({})}, //c1 macro expands to Rc::new(|ast,...| {})
+                action_tokens : quote::quote!{Some(Rc::new(|ast,token_stack,tl_stack,errors| {}))}, //c1 macro expands to Rc::new(|ast,...| {})
                 index: grammar.productions.vec.len()
             };
             $(
@@ -85,7 +85,7 @@ macro_rules! grammar {
             )?
             $(
                 {production.action = Some(Rc::new(|$arg1,$arg2,$arg3,$arg4| $expr))}
-                {production.action_tokens = quote::quote!{c!($expr)}}
+                {production.action_tokens = quote::quote!{Some(Rc::new(|$arg1,$arg2,$arg3,$arg4| $expr))}}
             )?
 
             grammar.productions.intern(production);})+

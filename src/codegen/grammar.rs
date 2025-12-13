@@ -27,8 +27,8 @@ impl<AST, Token, TranslatorStack> ToTokens for Grammar<AST, Token, TranslatorSta
         let productions = self.productions.to_tokens();
 
         let grammar = quote! {
-            let productions = vec![#(#productions_vec),*];
-            let symbols = vec![#(#symbols_vec),*];
+            let y = vec![#(#productions_vec),*];
+            let x = vec![#(#symbols_vec),*];
             Grammar {
                 start:#start,
                 productions:#productions,

@@ -10,7 +10,7 @@ impl<AST, Tokens, TranslatorStack> ToTokens for Production<AST, Tokens, Translat
     fn to_tokens(&self) -> TokenStream {
         let error_message = match &self.error_message {
             //sf!(err) expands to String::from(err)
-            Some(err) => quote! {Some(sf!(#err))},
+            Some(err) => quote! {Some(f!{#err})},
             None => quote! {None},
         };
         let action = if self.action_tokens.is_empty() {
@@ -18,7 +18,8 @@ impl<AST, Tokens, TranslatorStack> ToTokens for Production<AST, Tokens, Translat
         } else {
             self.action_tokens.clone()
         };
-        let action_tokens = quote! {None};
+        //q!{} expands to quote!{}
+        let action_tokens = quote! {quote!{}};
         let body: Vec<_> = self
             .body
             .iter()
@@ -58,16 +59,16 @@ impl<AST, Tokens, TranslatorStack> ToTokens for Productions<AST, Tokens, Transla
             .iter()
             .map(|(_key, value)| {
                 let index = value.0;
-                let key = quote! { pc!(#index)};
+                //pc!(index) => production[index].clone()
+                let key = quote! { d!{#index,y}};
                 let value = value.to_tokens();
                 quote! {(#key,#value)}
             })
             .collect();
-        //let vec_: Vec<TokenStream> = self.vec.iter().map(|symbol| symbol.to_tokens()).collect();
         let productions = quote! {
             Productions {
                 map: IndexMap::from([#(#map),*]),
-                vec: productions,
+                vec: y,
             }
         };
         productions

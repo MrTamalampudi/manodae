@@ -134,7 +134,7 @@ where
             error_message: None,
             #[allow(unused_variables)]
             action: Some(Rc::new(|ast, token_stack, tl_stack, errors| {})),
-            action_tokens: quote::quote! {Rc::new(|ast, token_stack, tl_stack, errors| {})},
+            action_tokens: quote::quote! {Some(Rc::new(|ast, token_stack, tl_stack, errors| {}))},
             index: 0,
         };
         productions.intern(augmented_production);

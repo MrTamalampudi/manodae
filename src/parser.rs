@@ -25,9 +25,9 @@ pub struct LR1_Parser<AST, Token, TranslatorStack> {
     pub goto: IndexMap<StateId, IndexMap<SymbolId, StateId>>,
     pub action: IndexMap<StateId, IndexMap<SymbolId, Action>>,
     //used only when constructing table, no need for parsing
-    item_closure_map: IndexMap<Item, Vec<Item>>,
+    pub item_closure_map: IndexMap<Item, Vec<Item>>,
     //used only when constructing table, no need for parsing
-    closure_map: IndexMap<Vec<Item>, Vec<Item>>,
+    pub closure_map: IndexMap<Vec<Item>, Vec<Item>>,
 }
 
 impl<AST, Token, TranslatorStack> LR1_Parser<AST, Token, TranslatorStack>

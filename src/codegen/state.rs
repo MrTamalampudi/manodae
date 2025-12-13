@@ -13,7 +13,7 @@ impl ToTokens for State {
         let items: Vec<_> = self.items.iter().map(|item| item.to_tokens()).collect();
 
         let state = quote! {
-            S::new(#index,vec![#(#items),*],#transition_symbol)
+            a::new(#index,vec![#(#items),*],#transition_symbol)
         };
         state
     }
@@ -34,17 +34,17 @@ impl ToTokens for States {
             .iter()
             .map(|(_, value)| {
                 let index = value.0;
-                let key = quote! { sc!(#index)};
+                let key = quote! { z[#index].clone()};
                 let value = value.to_tokens();
                 quote! {(#key,#value)}
             })
             .collect();
         let vec_: Vec<TokenStream> = self.vec.iter().map(|symbol| symbol.to_tokens()).collect();
         let states = quote! {
-            let states = vec![#(#vec_),*];
+            let z = vec![#(#vec_),*];
             States {
                 map: IndexMap::from([#(#map),*]),
-                vec: states,
+                vec: z,
             }
         };
         states

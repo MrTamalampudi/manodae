@@ -10,9 +10,9 @@ impl ToTokens for Symbol {
     fn to_tokens(&self) -> proc_macro2::TokenStream {
         let t = match self {
             //T(sf!(#terminal)) expands to TERMINAL(String::from("Some"))
-            Symbol::TERMINAL(terminal) => quote! { T(sf!(#terminal))},
-            //NT(sf!(#terminal)) expands to NONTERMINAL(String::from("Some"))
-            Symbol::NONTERMINAL(terminal) => quote! { NT(sf!(#terminal))},
+            Symbol::TERMINAL(terminal) => quote! { T(f!{#terminal})},
+            //N(sf!(#terminal)) expands to NONTERMINAL(String::from("Some"))
+            Symbol::NONTERMINAL(terminal) => quote! { N(f!{#terminal})},
         };
         t
     }
@@ -33,7 +33,8 @@ impl ToTokens for Symbols {
             .iter()
             .map(|(_key, value)| {
                 let index = value.0;
-                let key = quote! { sc!(#index)};
+                //sc!(index) => symbols[index].clone();
+                let key = quote! { e!{#index,x}};
                 let value = value.to_tokens();
                 quote! {(#key,#value)}
             })
@@ -49,7 +50,7 @@ impl ToTokens for Symbols {
         let symbols = quote! {
             Symbols {
                 map: IndexMap::from([#(#map),*]),
-                vec: symbols,
+                vec: x,
                 terminals: vec![#(#terminals),*],
                 non_terminals: vec![#(#non_terminals),*],
             }

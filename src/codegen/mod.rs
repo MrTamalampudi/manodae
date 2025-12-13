@@ -132,15 +132,17 @@ where
             include!(#F_ACTION);
             include!(#F_GOTO);
 
+
+
             fn get_parser() -> LR1_Parser<AST, Token, TranslatorStack> {
                 LR1_Parser {
-                    grammar: grammar(),
-                    LR1_automata: lr(),
-                    follow_set: follow(),
-                    first_set: first(),
+                    grammar: __grammar__(),
+                    LR1_automata: __lr__(),
+                    follow_set: __follow__(),
+                    first_set: __first__(),
                     conflicts: false,
-                    goto: goto(),
-                    action: action(),
+                    goto: __goto__(),
+                    action: __action__(),
                     //used only when constructing table, no need for parsing
                     item_closure_map: IndexMap::new(),
                     //used only when constructing table, no need for parsing
@@ -155,17 +157,16 @@ where
 
     fn write_grammar(&self, grammar: Grammar<AST, Token, TranslatorStack>) {
         let grammar = grammar.to_tokens();
-        let closure_macro = closure_macro();
-        let symbols_clone_macro = symbol_clone_macro();
-        let productions_clone_macro = production_clone_macro();
-        let string_from_macro = string_from_macro();
+        let q = quote_macro();
+        let f = string_from_macro();
+        let s = symbol_clone_macro();
+        let d = production_clone_macro();
         let code = quote! {
-            #symbols_clone_macro
-            #productions_clone_macro
-            #closure_macro
-            #string_from_macro
-
-            fn grammar() -> Grammar<AST, Token, TranslatorStack> {
+            #q
+            #f
+            #s
+            #d
+            fn __grammar__() -> Grammar<AST, Token, TranslatorStack> {
                 #grammar
             }
         };
@@ -176,23 +177,10 @@ where
 
     fn write_LR1_Automata(&self, lr: States) {
         let states = lr.to_tokens();
+
         let code = quote! {
-            use indexmap::IndexMap;
-            use manodae::grammar::Grammar;
-            use manodae::item::Item as I;
-            use manodae::production::ProductionId as p;
-            use manodae::state::State as S;
-            use manodae::state::StateId as i;
-            use manodae::state::States;
-            use manodae::symbol::SymbolId as s;
 
-            macro_rules! sc {
-                ($idx:expr) => {
-                    states[$idx].clone()
-                };
-            }
-
-            fn lr() -> States {
+            pub fn __lr__() -> States {
                 #states
             }
         };
@@ -202,6 +190,7 @@ where
     }
 
     fn write_first_follow_set(&self, set: IndexMap<SymbolId, IndexSet<SymbolId>>, name: &str) {
+        let isf = indexset_from_macro();
         let set: Vec<_> = set
             .iter()
             .map(|(key, value)| {
@@ -212,17 +201,15 @@ where
                         quote! {#tokens}
                     })
                     .collect();
-                let value = quote! {IndexSet::from([#(#value),*])};
+                let value = quote! {h!{[#(#value),*]}};
                 let key = key.to_tokens();
                 quote! {(#key,#value)}
             })
             .collect();
-        let file_name = format_ident!("{}", name);
+        let file_name = format_ident!("__{}__", name);
         let code = quote! {
-            use manodae::symbol::SymbolId as s;
-            use indexmap::IndexMap;
-            use indexmap::IndexSet;
-            fn #file_name() -> IndexMap<SymbolId, IndexSet<SymbolId>> {
+            #isf
+            pub fn #file_name() -> IndexMap<SymbolId, IndexSet<SymbolId>> {
                 IndexMap::from([#(#set),*])
             }
         };
@@ -234,7 +221,7 @@ where
     }
 
     fn write_action(&self, action: IndexMap<StateId, IndexMap<SymbolId, Action>>) {
-        let indexmap_from = indexmap_from_macro();
+        let imf = indexmap_from_macro();
         let action: Vec<_> = action
             .iter()
             .map(|(key, value)| {
@@ -248,22 +235,13 @@ where
                     .collect();
                 let key = key.to_tokens();
                 //m! expands to IndexMap::from(..);
-                let value = quote! {m!([#(#value),*])};
+                let value = quote! {{g!{[#(#value),*]}}};
                 quote! {(#key,#value)}
             })
             .collect();
         let code = quote! {
-            use indexmap::{IndexMap, IndexSet};
-            use manodae::state::StateId as i;
-            use manodae::action::Action::SHIFT as S;
-            use manodae::action::Action::REDUCE as R;
-            use manodae::action::Action::ERROR as E;
-            use manodae::action::Action::ACCEPT as A;
-            use manodae::symbol::SymbolId as s;
-
-            #indexmap_from
-
-            fn action() -> IndexMap<StateId, IndexMap<SymbolId, Action>> {
+            #imf
+            pub fn __action__() -> IndexMap<StateId, IndexMap<SymbolId, Action>> {
                 IndexMap::from([#(#action),*])
             }
         };
@@ -273,7 +251,7 @@ where
     }
 
     fn write_goto(&self, goto: IndexMap<StateId, IndexMap<SymbolId, StateId>>) {
-        let indexmap_from = indexmap_from_macro();
+        let imf = indexmap_from_macro();
         let goto: Vec<_> = goto
             .iter()
             .map(|(key, value)| {
@@ -286,19 +264,14 @@ where
                     })
                     .collect();
                 let key = key.to_tokens();
-                //m! expands to IndexMap::from(..);
-                let value = quote! {m!([#(#value),*])};
+                //g! expands to IndexMap::from(..);
+                let value = quote! {{g!{[#(#value),*]}}};
                 quote! {(#key,#value)}
             })
             .collect();
         let code = quote! {
-            use indexmap::{IndexMap, IndexSet};
-            use manodae::state::StateId as i;
-            use manodae::symbol::SymbolId as s;
-
-            #indexmap_from
-
-            fn action() -> IndexMap<StateId, IndexMap<SymbolId, Action>> {
+            #imf
+            pub fn __goto__() -> IndexMap<StateId, IndexMap<SymbolId, StateId>> {
                 IndexMap::from([#(#goto),*])
             }
         };
@@ -309,36 +282,27 @@ where
 }
 
 // fn write_parser(parser: LR1_Parser<AST, Token, TranslatorStack>) {}
-fn closure_macro() -> TokenStream {
-    quote! {
-        macro_rules! c {
-            ($b:block) => {
-                Rc::new(|ast, token_stack, tl_stack, errors| $b)
-            };
-        }
-    }
-}
 fn production_clone_macro() -> TokenStream {
     quote! {
-        macro_rules! pc {
-            ($idx:expr) => {
-                productions[$idx].clone()
+        macro_rules! d {
+            ($idx:expr,$p:ident) => {
+                $p[$idx].clone()
             };
         }
     }
 }
 fn symbol_clone_macro() -> TokenStream {
     quote! {
-        macro_rules! sc {
-            ($idx:expr) => {
-                symbols[$idx].clone()
+        macro_rules! e {
+            ($idx:expr,$s:ident) => {
+                $s[$idx].clone()
             };
         }
     }
 }
 fn string_from_macro() -> TokenStream {
     quote! {
-        macro_rules! sf {
+        macro_rules! f {
             ($s:expr) => {
                 String::from($s)
             };
@@ -347,9 +311,36 @@ fn string_from_macro() -> TokenStream {
 }
 fn indexmap_from_macro() -> TokenStream {
     quote! {
-        macro_rules! m {
+        macro_rules! g {
             ($s:expr) => {
                 IndexMap::from($s)
+            };
+        }
+    }
+}
+fn indexset_from_macro() -> TokenStream {
+    quote! {
+        macro_rules! h {
+            ($s:expr) => {
+                IndexSet::from($s)
+            };
+        }
+    }
+}
+fn state_clone_macro() -> TokenStream {
+    quote! {
+        macro_rules! j {
+            ($idx:expr,$s:ident) => {
+                $s[$idx].clone()
+            };
+        }
+    }
+}
+fn quote_macro() -> TokenStream {
+    quote! {
+        macro_rules! q {
+            () => {
+                quote!{}
             };
         }
     }
