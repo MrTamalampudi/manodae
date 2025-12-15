@@ -173,6 +173,7 @@ where
         let s = symbol_clone_macro();
         let d = production_clone_macro();
         let code = quote! {
+            #[allow(unused_variables)]
             #q
             #f
             #s
