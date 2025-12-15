@@ -59,7 +59,10 @@ where
         grammar: Grammar<AST, Token, TranslatorStack>,
         generics: [&'static str; 3],
     ) {
-        let path = path.parent().unwrap().to_path_buf();
+        let path = std::env::current_dir()
+            .unwrap()
+            .join("..")
+            .join(path.parent().unwrap().to_path_buf());
         let mut codegen = Codegen {
             path: path,
             grammar: grammar,
