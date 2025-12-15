@@ -171,16 +171,15 @@ where
     fn write_grammar(&self, grammar: Grammar<AST, Token, TranslatorStack>) {
         let [a, t, ts] = [&self.generics[0], &self.generics[1], &self.generics[2]];
         let grammar = grammar.to_tokens();
-        let q = quote_macro();
         let f = string_from_macro();
         let s = symbol_clone_macro();
         let d = production_clone_macro();
         let code = quote! {
-            #[allow(unused_variables)]
-            #q
             #f
             #s
             #d
+
+            #[allow(unused_variables)]
             fn __grammar__() -> Grammar<#a,#t ,#ts> {
                 #grammar
             }
@@ -338,24 +337,6 @@ fn indexset_from_macro() -> TokenStream {
         macro_rules! h {
             ($s:expr) => {
                 IndexSet::from($s)
-            };
-        }
-    }
-}
-fn state_clone_macro() -> TokenStream {
-    quote! {
-        macro_rules! j {
-            ($idx:expr,$s:ident) => {
-                $s[$idx].clone()
-            };
-        }
-    }
-}
-fn quote_macro() -> TokenStream {
-    quote! {
-        macro_rules! q {
-            () => {
-                quote!{}
             };
         }
     }
