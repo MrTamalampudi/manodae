@@ -426,7 +426,6 @@ where
                     _ => {}
                 }
             } else {
-                let mut input_symbol_skip_count = 0;
                 let error_token = current_input;
                 //error recovery
                 //implement second method in this paper https://ieeexplore.ieee.org/document/6643853
@@ -435,73 +434,99 @@ where
                 let mut error_message = self.counstruct_syntax_error_message(S0);
 
                 let deduced_items = s0_state.transistion_productions(&self.grammar.productions);
-                let mut deduced_production: Option<Production<AST, Token, TranslatorStack>> = None;
-                loop {
-                    stack.pop();
-                    let so_o = stack.last();
-                    if let None = so_o {
-                        break;
-                    }
-                    S0 = so_o.unwrap();
-                    let goto_map = self.goto.get(S0).unwrap();
-                    let keys: Vec<SymbolId> = goto_map.clone().into_keys().collect();
-                    let mut contains = false;
-                    for item in deduced_items.iter() {
-                        let production = self.grammar.productions.lookup(item.production);
-                        if keys.contains(&production.head) {
-                            contains = true;
-                            deduced_production = Some(production);
-                            break;
-                        }
-                    }
-                    if contains {
-                        break;
+
+                if deduced_items.len() == 1 {
+                    let item = deduced_items.first().unwrap();
+                    let production = self.grammar.productions.lookup(item.production);
+                    if production.error_message.is_some() {
+                        error_message = production.error_message.unwrap().clone();
                     }
                 }
-                //skip input till input character contains in followset of ...
-                //top_state transition symbol
-                if let None = deduced_production {
-                    break;
+
+                if current_input_symbol == Symbol::TERMINAL(String::from("EOF")) {
+                    errors.push(ParseError {
+                        token: previous_input.clone(),
+                        message: error_message.clone(),
+                        production_end: true,
+                    });
+                } else {
+                    errors.push(ParseError {
+                        token: error_token.clone(),
+                        message: error_message,
+                        production_end: false,
+                    });
                 }
-                let error_production_follow_set = self
-                    .follow_set
-                    .get(&deduced_production.clone().unwrap().head.clone())
-                    .unwrap();
-                loop {
-                    let symbol_id = self.grammar.symbols.reverse_lookup(&current_input_symbol);
-                    if symbol_id.is_none() {
-                        panic!("symbol not found");
-                    }
-                    if error_production_follow_set.contains(&symbol_id.unwrap()) {
-                        if deduced_production.clone().unwrap().error_message.is_some() {
-                            //let a = deduced_production.unwrap().clone(); todo
-                            error_message = "SOme".to_string();
-                        }
-                        if input_symbol_skip_count == 0 {
-                            errors.push(ParseError {
-                                token: previous_input.clone(),
-                                message: error_message,
-                                production_end: true,
-                            });
-                        } else {
-                            errors.push(ParseError {
-                                token: error_token.clone(),
-                                message: error_message,
-                                production_end: false,
-                            });
-                        }
-                        break;
-                    } else {
-                        input_symbol_skip_count += 1;
-                        previous_input = current_input;
-                        let ci_o = input_iter.next();
-                        if let None = ci_o {
-                            break;
-                        }
-                        current_input = ci_o.unwrap();
-                        current_input_symbol = Symbol::TERMINAL(current_input.to_string());
-                    }
-                }
+
+                return;
+
+                // let mut deduced_production: Option<Production<AST, Token, TranslatorStack>> = None;
+                // loop {
+                //     stack.pop();
+                //     let so_o = stack.last();
+                //     if let None = so_o {
+                //         break;
+                //     }
+                //     S0 = so_o.unwrap();
+                //     let goto_map = self.goto.get(S0).unwrap();
+                //     let keys: Vec<SymbolId> = goto_map.clone().into_keys().collect();
+                //     let mut contains = false;
+                //     for item in deduced_items.iter() {
+                //         let production = self.grammar.productions.lookup(item.production);
+                //         if keys.contains(&production.head) {
+                //             contains = true;
+                //             deduced_production = Some(production);
+                //             break;
+                //         }
+                //     }
+                //     if contains {
+                //         break;
+                //     }
+                // }
+                // //skip input till input character contains in followset of ...
+                // //top_state transition symbol
+                // if let None = deduced_production {
+                //     break;
+                // }
+                // let error_production_follow_set = self
+                //     .follow_set
+                //     .get(&deduced_production.clone().unwrap().head.clone())
+                //     .unwrap();
+                // loop {
+                //     let symbol_id = self.grammar.symbols.reverse_lookup(&current_input_symbol);
+                //     if symbol_id.is_none() {
+                //         panic!("symbol not found");
+                //     }
+                //     if error_production_follow_set.contains(&symbol_id.unwrap()) {
+                //         if deduced_production.clone().unwrap().error_message.is_some() {
+                //             //let a = deduced_production.unwrap().clone(); todo
+                //             error_message =
+                //                 deduced_production.clone().unwrap().error_message.unwrap();
+                //         }
+                //         if input_symbol_skip_count == 0 {
+                //             errors.push(ParseError {
+                //                 token: previous_input.clone(),
+                //                 message: error_message,
+                //                 production_end: true,
+                //             });
+                //         } else {
+                //             errors.push(ParseError {
+                //                 token: error_token.clone(),
+                //                 message: error_message,
+                //                 production_end: false,
+                //             });
+                //         }
+                //         break;
+                //     } else {
+                //         input_symbol_skip_count += 1;
+                //         previous_input = current_input;
+                //         let ci_o = input_iter.next();
+                //         if let None = ci_o {
+                //             break;
+                //         }
+                //         current_input = ci_o.unwrap();
+                //         current_input_symbol = Symbol::TERMINAL(current_input.to_string());
+                //     }
+                // }
             }
         }
     }
