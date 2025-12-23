@@ -7,6 +7,7 @@ use indexmap::{IndexMap, IndexSet};
 use crate::{
     production::{ProductionId, Productions},
     symbol::{SymbolId, Symbols, START_SYMBOL_ID},
+    token_kind::TokenKind,
 };
 
 #[derive(Debug, Clone)]
@@ -18,7 +19,10 @@ pub struct Grammar<AST, Token, TranslatorStack> {
     pub production_head_map: IndexMap<SymbolId, IndexSet<ProductionId>>,
 }
 
-impl<AST, Token, TranslatorStack> Hash for Grammar<AST, Token, TranslatorStack> {
+impl<AST, Token, TranslatorStack> Hash for Grammar<AST, Token, TranslatorStack>
+where
+    Token: TokenKind,
+{
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.symbols.hash(state);
         self.start.hash(state);
@@ -29,7 +33,7 @@ impl<AST, Token, TranslatorStack> Hash for Grammar<AST, Token, TranslatorStack> 
 impl<AST, Token, TranslatorStack> Grammar<AST, Token, TranslatorStack>
 where
     AST: Clone,
-    Token: Clone,
+    Token: Clone + TokenKind,
     TranslatorStack: Clone,
 {
     pub fn new() -> Self {

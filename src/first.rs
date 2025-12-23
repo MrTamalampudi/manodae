@@ -3,15 +3,15 @@ use indexmap::{IndexMap, IndexSet};
 use crate::{
     grammar::Grammar,
     symbol::{SymbolId, EOF_SYMBOL_ID},
+    token_kind::TokenKind,
 };
 
-pub fn compute_first_set<AST, Token, TranslatorStack>(
+pub fn compute_first_set<AST, Token: TokenKind, TranslatorStack>(
     grammar: &Grammar<AST, Token, TranslatorStack>,
 ) -> IndexMap<SymbolId, IndexSet<SymbolId>> {
     let mut first_map: IndexMap<SymbolId, IndexSet<SymbolId>> = IndexMap::new();
     let mut first_map_: IndexMap<SymbolId, IndexSet<SymbolId>> = IndexMap::new();
     let mut productions_hashmap: IndexMap<SymbolId, Vec<Vec<SymbolId>>> = IndexMap::new();
-
     let mut symbols = vec![EOF_SYMBOL_ID];
     symbols.extend(grammar.symbols.terminals.clone());
     symbols.extend(grammar.symbols.non_terminals.clone());

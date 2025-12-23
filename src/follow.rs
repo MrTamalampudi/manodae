@@ -5,9 +5,10 @@ use crate::{
     grammar::Grammar,
     production::Production,
     symbol::{SymbolId, AUGMENT_START_SYMBOL_ID, EOF_SYMBOL_ID},
+    token_kind::TokenKind,
 };
 
-pub fn compute_follow_set<AST, Token, TranslatorStack>(
+pub fn compute_follow_set<AST, Token: TokenKind, TranslatorStack>(
     grammar: &Grammar<AST, Token, TranslatorStack>,
 ) -> IndexMap<SymbolId, IndexSet<SymbolId>> {
     let mut follow_map: IndexMap<SymbolId, IndexSet<SymbolId>> = IndexMap::new();
