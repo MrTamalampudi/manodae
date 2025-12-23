@@ -65,6 +65,7 @@ impl Hash for Symbols {
 pub(crate) const AUGMENT_START_SYMBOL_ID: SymbolId = SymbolId(0);
 pub(crate) const EOF_SYMBOL_ID: SymbolId = SymbolId(1);
 pub(crate) const START_SYMBOL_ID: SymbolId = SymbolId(2);
+pub const ERROR_SYMBOL_ID: SymbolId = SymbolId(3);
 
 impl Interner for Symbols {
     type T = Symbol;
@@ -104,6 +105,7 @@ impl Symbols {
         symbols.intern(Symbol::NONTERMINAL(String::from("S'")));
         symbols.intern(Symbol::TERMINAL(String::from("EOF")));
         symbols.intern(Symbol::NONTERMINAL("Start".to_string()));
+        symbols.intern(Symbol::TERMINAL(String::from("##__error__manodae__##")));
         symbols
     }
     #[inline]

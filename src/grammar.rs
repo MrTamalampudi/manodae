@@ -57,18 +57,32 @@ macro_rules! grammar {
         let mut grammar = Grammar::new();
         $({
             $({let mut body_ : Vec<SymbolId> = Vec::new();
+            let head = Symbol::NONTERMINAL(stringify!($head).to_string());
+            let head_id = grammar.symbols.intern(head);
                 $(
                     let terminal = Symbol::TERMINAL($terminal.to_string());
                     let terminal_id = grammar.symbols.intern(terminal);
                     body_.push(terminal_id);
+
+                    // for every production 𝐴 → 𝛼
+                    // an error production  𝐴 → 𝑒𝑟𝑟𝑜𝑟 will be added
+                    // 𝛼 , 𝑒𝑟𝑟𝑜𝑟 are terminals
+                    #[allow(unused_mut)]
+                    let mut error_production = Production {
+                        head: head_id,
+                        body: vec![$crate::symbol::ERROR_SYMBOL_ID],
+                        error_message: None,
+                        action:None,
+                        action_tokens : quote::quote!{Some(Rc::new(|ast,token_stack,tl_stack,errors| {}))}, //c1 macro expands to Rc::new(|ast,...| {})
+                        index: grammar.productions.vec.len()
+                    };
+                    grammar.productions.intern(error_production);
                 )?
                 $(
                     let non_terminal = Symbol::NONTERMINAL(stringify!($non_terminal).to_string());
                     let non_terminal_id = grammar.symbols.intern(non_terminal);
                     body_.push(non_terminal_id);
                 )*
-            let head = Symbol::NONTERMINAL(stringify!($head).to_string());
-            let head_id = grammar.symbols.intern(head);
             #[allow(unused_mut)]
             let mut production = Production {
                 head: head_id,
