@@ -1,9 +1,9 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use crate::{codegen::ToTokens, parser::LR1_Parser, token_kind::TokenKind};
+use crate::{codegen::ToTokens, parser::LR1_Parser};
 
-impl<AST, Token: TokenKind, TranslatorStack> ToTokens for LR1_Parser<AST, Token, TranslatorStack> {
+impl<AST, Token, TranslatorStack> ToTokens for LR1_Parser<AST, Token, TranslatorStack> {
     fn to_tokens(&self) -> TokenStream {
         let LR1_automata = self.LR1_automata.to_tokens();
 

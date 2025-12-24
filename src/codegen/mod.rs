@@ -18,7 +18,6 @@ use crate::{
     parser::LR1_Parser,
     state::{StateId, States},
     symbol::SymbolId,
-    token_kind::TokenKind,
 };
 
 mod action;
@@ -52,7 +51,7 @@ const F_HASH: &str = "hash.txt";
 impl<AST, Token, TranslatorStack> Codegen<AST, Token, TranslatorStack>
 where
     AST: Debug + PartialEq + Clone,
-    Token: Debug + PartialEq + Clone + ToString + TokenKind,
+    Token: Debug + PartialEq + Clone + ToString,
     TranslatorStack: Debug + PartialEq + Clone,
 {
     pub fn gen(
