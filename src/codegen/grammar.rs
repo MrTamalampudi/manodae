@@ -1,10 +1,10 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use crate::{codegen::ToTokens, grammar::Grammar};
+use crate::{codegen::ToTokens, grammar::Grammar, token_kind::TokenKind};
 
 // todo add symbols field to G
-impl<AST, Token, TranslatorStack> ToTokens for Grammar<AST, Token, TranslatorStack> {
+impl<AST, Token: TokenKind, TranslatorStack> ToTokens for Grammar<AST, Token, TranslatorStack> {
     fn to_tokens(&self) -> TokenStream {
         let start = &self.start.to_tokens();
         let start = quote! {#start};

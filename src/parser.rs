@@ -10,9 +10,10 @@ use crate::{
     grammar::Grammar,
     interner::Interner,
     item::{Item, ItemVecExtension},
-    production::{Production, ProductionId, AUGMENT_PRODUCTION_ID},
+    production::{ProductionId, AUGMENT_PRODUCTION_ID},
     state::{State, StateId, StateVecExtension, States},
-    symbol::{Symbol, SymbolId, AUGMENT_START_SYMBOL_ID, EOF_SYMBOL_ID},
+    symbol::{Symbol, SymbolId, AUGMENT_START_SYMBOL_ID, EOF_SYMBOL_ID, ERROR_SYMBOL_ID},
+    token_kind::TokenKind,
 };
 
 #[derive(Debug, Clone)]
@@ -33,7 +34,7 @@ pub struct LR1_Parser<AST, Token, TranslatorStack> {
 impl<AST, Token, TranslatorStack> LR1_Parser<AST, Token, TranslatorStack>
 where
     AST: Clone + Debug + PartialEq,
-    Token: ToString + Debug + Clone + PartialEq,
+    Token: ToString + Debug + Clone + PartialEq + TokenKind,
     TranslatorStack: Clone + Debug + PartialEq,
 {
     pub fn new(
