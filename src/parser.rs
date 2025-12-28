@@ -12,7 +12,7 @@ use crate::{
     item::{Item, ItemVecExtension},
     production::{ProductionId, AUGMENT_PRODUCTION_ID},
     state::{State, StateId, StateVecExtension, States},
-    symbol::{Symbol, SymbolId, AUGMENT_START_SYMBOL_ID, EOF_SYMBOL_ID, ERROR_SYMBOL_ID},
+    symbol::{Symbol, SymbolId, AUGMENT_START_SYMBOL_ID, EOF_SYMBOL_ID},
     token_kind::TokenKind,
 };
 
@@ -387,7 +387,7 @@ where
             let action_map = self.action.get(S0).unwrap();
             let symbol_id = self.grammar.symbols.reverse_lookup(&current_input_symbol);
             if symbol_id.is_none() {
-                panic!("symbol not found");
+                return;
             }
             if let Some(action) = action_map.get(&symbol_id.unwrap()) {
                 match action {
@@ -421,7 +421,6 @@ where
                         }
                     }
                     Action::ACCEPT => {
-                        println!("heyyyyyyy");
                         break;
                     }
                     _ => {}
@@ -444,7 +443,7 @@ where
                     }
                 }
 
-                if current_input_symbol == Symbol::TERMINAL(String::from("EOF")) {
+                if current_input_symbol == Symbol::TERMINAL(Token::eof().to_string()) {
                     errors.push(ParseError {
                         token: previous_input.clone(),
                         message: error_message.clone(),
