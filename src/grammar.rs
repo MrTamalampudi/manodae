@@ -53,7 +53,7 @@ macro_rules! start_production {
     (
         $grammar:ident,
         $($start_non_terminal:ident)+
-        $({ |$s_arg1:ident,$s_arg2:ident,$s_arg3:ident,$s_arg4:ident| $s_expr:block})?
+        $({ |$s_arg1:ident,$s_arg2:ident,$s_arg3:ident,$s_arg4:ident| $s_expr:expr})?
     ) => {
             let mut body_ : Vec<SymbolId> = Vec::new();
             $(
@@ -84,7 +84,7 @@ macro_rules! terminal_production {
         $grammar:ident,
         $head:ident,
         [$terminal:expr]
-        $({ |$s_arg1:ident,$s_arg2:ident,$s_arg3:ident,$s_arg4:ident| $s_expr:block})?
+        $({ |$s_arg1:ident,$s_arg2:ident,$s_arg3:ident,$s_arg4:ident| $s_expr:expr})?
     ) => {
 
         //lhs
@@ -123,7 +123,7 @@ macro_rules! non_terminal_production {
         $grammar:ident,
         $head:ident,
         $($non_terminal:ident)+
-        $({ |$s_arg1:ident,$s_arg2:ident,$s_arg3:ident,$s_arg4:ident| $s_expr:block})?
+        $({ |$s_arg1:ident,$s_arg2:ident,$s_arg3:ident,$s_arg4:ident| $s_expr:expr})?
     ) => {
 
         //lhs
@@ -163,7 +163,7 @@ macro_rules! grammar{
     (
         Start -> $(
             $($start_non_terminal:ident)+
-            $({|$s_arg1:ident,$s_arg2:ident,$s_arg3:ident,$s_arg4:ident| $s_expr:block})?
+            $({|$s_arg1:ident,$s_arg2:ident,$s_arg3:ident,$s_arg4:ident| $s_expr:expr})?
         )|+;
 
         $([non_terminal_productions])?
@@ -171,7 +171,7 @@ macro_rules! grammar{
         $(
             $non_terminal_head:ident -> $(
                 $($non_terminal:ident)+
-                $({|$n_arg1:ident,$n_arg2:ident,$n_arg3:ident,$n_arg4:ident| $n_expr:block})?
+                $({|$n_arg1:ident,$n_arg2:ident,$n_arg3:ident,$n_arg4:ident| $n_expr:expr})?
             )|+
         ;)*
 
@@ -180,7 +180,7 @@ macro_rules! grammar{
         $(
             $terminal_head:ident -> $(
                 [$end_terminal:expr]
-                $({|$e_arg1:ident,$e_arg2:ident,$e_arg3:ident,$e_arg4:ident| $e_expr:block})?
+                $({|$e_arg1:ident,$e_arg2:ident,$e_arg3:ident,$e_arg4:ident| $e_expr:expr})?
             )|+;
         )+
     ) => {{
