@@ -9,6 +9,7 @@ use std::{
 };
 
 use indexmap::{IndexMap, IndexSet};
+use logos::Logos;
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 
@@ -18,7 +19,7 @@ use crate::{
     parser::LR1_Parser,
     state::{StateId, States},
     symbol::SymbolId,
-    token_kind::TokenKind,
+    token::TokenKind,
 };
 
 mod action;
@@ -52,7 +53,7 @@ const F_HASH: &str = "hash.txt";
 impl<AST, Token, TranslatorStack> Codegen<AST, Token, TranslatorStack>
 where
     AST: Debug + PartialEq + Clone,
-    Token: Debug + PartialEq + Clone + ToString + TokenKind,
+    Token: Debug + PartialEq + Clone + ToString + TokenKind + Logos<'static>,
     TranslatorStack: Debug + PartialEq + Clone,
 {
     pub fn gen(

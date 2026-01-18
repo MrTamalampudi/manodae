@@ -1,6 +1,7 @@
 use std::{hash::Hash, rc::Rc};
 
 use indexmap::IndexMap;
+use logos::Span;
 use proc_macro2::TokenStream;
 
 use crate::{
@@ -21,9 +22,9 @@ pub struct Production<AST, Token, TranslatorStack> {
         Rc<
             dyn Fn(
                 &mut AST,
-                &mut Vec<Token>,
+                &mut Vec<(Token, Span)>,
                 &mut Vec<TranslatorStack>,
-                &mut Vec<ParseError<Token>>,
+                &mut Vec<ParseError>,
             ),
         >,
     >,
@@ -40,9 +41,9 @@ impl<AST, Token, TranslatorStack> Production<AST, Token, TranslatorStack> {
             Rc<
                 dyn Fn(
                     &mut AST,
-                    &mut Vec<Token>,
+                    &mut Vec<(Token, Span)>,
                     &mut Vec<TranslatorStack>,
-                    &mut Vec<ParseError<Token>>,
+                    &mut Vec<ParseError>,
                 ),
             >,
         >,

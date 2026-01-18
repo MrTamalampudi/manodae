@@ -1,6 +1,7 @@
 use std::{cell::RefCell, fmt::Debug, process::exit, rc::Rc};
 
 use indexmap::{IndexMap, IndexSet};
+use logos::{Lexer, Logos, Span};
 
 use crate::{
     action::Action,
@@ -13,7 +14,7 @@ use crate::{
     production::{ProductionId, AUGMENT_PRODUCTION_ID},
     state::{State, StateId, StateVecExtension, States},
     symbol::{Symbol, SymbolId, AUGMENT_START_SYMBOL_ID, EOF_SYMBOL_ID},
-    token_kind::TokenKind,
+    token::TokenKind,
 };
 
 #[derive(Debug, Clone)]
@@ -31,10 +32,10 @@ pub struct LR1_Parser<AST, Token, TranslatorStack> {
     pub closure_map: IndexMap<Vec<Item>, Vec<Item>>,
 }
 
-impl<AST, Token, TranslatorStack> LR1_Parser<AST, Token, TranslatorStack>
+impl<'a, AST, Token, TranslatorStack> LR1_Parser<AST, Token, TranslatorStack>
 where
     AST: Clone + Debug + PartialEq,
-    Token: ToString + Debug + Clone + PartialEq + TokenKind,
+    Token: ToString + Debug + Clone + PartialEq + TokenKind + Logos<'a>,
     TranslatorStack: Clone + Debug + PartialEq,
 {
     pub fn new(
@@ -363,22 +364,21 @@ where
     // }
     pub fn parse(
         &mut self,
-        tokens_input: Vec<Token>,
-        errors: &mut Vec<ParseError<Token>>,
+        mut lexer: Lexer<'a, Token>,
+        errors: &mut Vec<ParseError>,
         ast: &mut AST,
     ) {
         let mut stack: Vec<StateId> = vec![];
-        let mut input_iter = tokens_input.iter();
-        let mut current_input = if let Some(input) = input_iter.next() {
+        let mut current_input = if let Some(Ok(input)) = lexer.next() {
             input
         } else {
-            exit(1)
+            return;
         };
-        let mut previous_input = current_input;
+        let mut previous_input = current_input.clone();
         let mut current_input_symbol = Symbol::TERMINAL(current_input.to_string());
         let mut S0 = self.LR1_automata.map.first().unwrap().1;
         let mut translator_stack: Vec<TranslatorStack> = Vec::new();
-        let mut input_token_stack: Vec<Token> = Vec::new();
+        let mut input_token_stack: Vec<(Token, Span)> = Vec::new();
 
         stack.push(*S0);
         loop {
@@ -395,11 +395,19 @@ where
                         stack.push(*stateId);
 
                         //To maintain current input as a stack helps library user;
-                        input_token_stack.push(current_input.clone());
+                        input_token_stack.push((current_input.clone(), lexer.span()));
 
-                        previous_input = current_input;
-                        current_input = input_iter.next().unwrap();
-                        current_input_symbol = Symbol::TERMINAL(current_input.to_string());
+                        previous_input = current_input.clone();
+                        if let Some(i_result) = lexer.next() {
+                            if let Ok(input) = i_result {
+                                current_input = input;
+                                current_input_symbol = Symbol::TERMINAL(current_input.to_string());
+                            } else {
+                                return;
+                            }
+                        } else {
+                            current_input_symbol = Symbol::TERMINAL("EOF".to_string());
+                        };
                     }
                     Action::REDUCE(productionId) => {
                         let production = self.grammar.productions.lookup(*productionId);
@@ -445,13 +453,13 @@ where
 
                 if current_input_symbol == Symbol::TERMINAL(Token::eof().to_string()) {
                     errors.push(ParseError {
-                        token: previous_input.clone(),
+                        span: lexer.span(),
                         message: error_message.clone(),
                         production_end: true,
                     });
                 } else {
                     errors.push(ParseError {
-                        token: error_token.clone(),
+                        span: lexer.span(),
                         message: error_message,
                         production_end: false,
                     });

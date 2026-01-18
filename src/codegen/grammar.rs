@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use crate::{codegen::ToTokens, grammar::Grammar, token_kind::TokenKind};
+use crate::{codegen::ToTokens, grammar::Grammar, token::TokenKind};
 
 // todo add symbols field to G
 impl<AST, Token: TokenKind, TranslatorStack> ToTokens for Grammar<AST, Token, TranslatorStack> {

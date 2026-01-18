@@ -5,7 +5,7 @@ use crate::{
     grammar::Grammar,
     production::Production,
     symbol::{SymbolId, AUGMENT_START_SYMBOL_ID, EOF_SYMBOL_ID},
-    token_kind::TokenKind,
+    token::TokenKind,
 };
 
 pub fn compute_follow_set<AST, Token: TokenKind, TranslatorStack>(

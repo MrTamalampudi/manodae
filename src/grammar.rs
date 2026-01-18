@@ -7,7 +7,7 @@ use indexmap::{IndexMap, IndexSet};
 use crate::{
     production::{ProductionId, Productions},
     symbol::{SymbolId, Symbols, START_SYMBOL_ID},
-    token_kind::TokenKind,
+    token::TokenKind,
 };
 
 #[derive(Debug, Clone)]

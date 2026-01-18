@@ -14,7 +14,7 @@ pub mod production;
 pub mod render_table;
 pub mod state;
 pub mod symbol;
-pub mod token_kind;
+pub mod token;
 
 pub mod prelude {
     pub use crate::action::Action;

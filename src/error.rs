@@ -1,15 +1,17 @@
+use std::ops::Range;
+
 #[derive(Debug, Clone)]
-pub struct ParseError<Token> {
-    pub token: Token,
+pub struct ParseError {
+    pub span: Range<usize>,
     pub message: String,
     //if the error is at the end of production set true
     pub production_end: bool,
 }
 
-impl<Token> ParseError<Token> {
-    pub fn new(token: Token, message: String) -> ParseError<Token> {
+impl ParseError {
+    pub fn new(span: Range<usize>, message: String) -> ParseError {
         ParseError {
-            token,
+            span,
             message,
             production_end: false,
         }

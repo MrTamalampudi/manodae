@@ -3,7 +3,7 @@ use indexmap::{IndexMap, IndexSet};
 use crate::{
     grammar::Grammar,
     symbol::{SymbolId, EOF_SYMBOL_ID},
-    token_kind::TokenKind,
+    token::TokenKind,
 };
 
 pub fn compute_first_set<AST, Token: TokenKind, TranslatorStack>(
